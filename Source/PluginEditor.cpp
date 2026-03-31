@@ -14,6 +14,8 @@ WaveformDisplay::WaveformDisplay(AudioPluginAudioProcessor& p)
 }
 void WaveformDisplay::paint(juce::Graphics& g) {
     g.fillAll(juce::Colours::black);
+    g.setColour(juce::Colours::slategrey);
+    g.drawRect(0, 0, getWidth(), getHeight());
 
     auto& data = processor.scopeData;
     int writePos = processor.scopeWritePos.load();
@@ -297,7 +299,7 @@ AudioPluginAudioProcessorEditor::~AudioPluginAudioProcessorEditor() = default;
 
 void AudioPluginAudioProcessorEditor::paint (juce::Graphics& g)
 {
-    g.fillAll(juce::Colours::black);
+    g.fillAll(juce::Colour(0xff1e1e1e));
     const int numControls = 4;
     const int margin = 10;
     juce::Rectangle<int> area = (getLocalBounds());
@@ -308,28 +310,38 @@ void AudioPluginAudioProcessorEditor::paint (juce::Graphics& g)
 
     juce::Rectangle<int> masterBorder;
     masterBorder.setBounds(margin, controlHeight, rectangleWidth, areaHeight);
-    g.setColour(juce::Colours::red);
+    g.setColour(juce::Colours::darkred);
     g.drawRoundedRectangle(masterBorder.toFloat(), 0.0f,2.0f);
+    g.setColour(juce::Colour(0xff001933));
+    g.fillRect(masterBorder.toFloat());
 
     juce::Rectangle<int> oscBorder;
     oscBorder.setBounds((margin * 2) + rectangleWidth, controlHeight, rectangleWidth, areaHeight);
-    g.setColour(juce::Colours::blue);
+    g.setColour(juce::Colours::darkblue);
     g.drawRoundedRectangle(oscBorder.toFloat(), 0.0f,2.0f);
+    g.setColour(juce::Colour(0xff28643C));
+    g.fillRect(oscBorder.toFloat());
 
     juce::Rectangle<int> adsrBorder;
     adsrBorder.setBounds((margin * 3) + (rectangleWidth * 2), controlHeight, rectangleWidth, areaHeight);
-    g.setColour(juce::Colours::yellow);
+    g.setColour(juce::Colours::darkorange);
     g.drawRoundedRectangle(adsrBorder.toFloat(), 0.0f,2.0f);
+    g.setColour(juce::Colour(0xff4C197F));
+    g.fillRect(adsrBorder.toFloat());
+
 
     // Cyan band border
     juce::Rectangle<int> filterBorder;
     filterBorder.setBounds((margin * 4) + (rectangleWidth * 3), controlHeight, rectangleWidth, areaHeight);
-    g.setColour(juce::Colours::cyan);
+    g.setColour(juce::Colours::darkcyan);
     g.drawRoundedRectangle(filterBorder.toFloat(), 0.0f,2.0f);
+    g.setColour(juce::Colour(0xff7F6B00));
+    g.fillRect(filterBorder.toFloat());
 }
 
 void AudioPluginAudioProcessorEditor::resized() {
     const int margin = 10;
+    const int waveformBottomGap = 15;
     auto area = getLocalBounds();
 
     auto layoutColumn = [] (juce::Rectangle<int> area,
@@ -343,6 +355,7 @@ void AudioPluginAudioProcessorEditor::resized() {
 
     // Split Window
     auto topArea = area.removeFromTop(area.getHeight() / 2);
+    topArea.removeFromBottom(waveformBottomGap);
     waveformDisplay.setBounds(topArea.reduced(margin));
 
     // Control Zone

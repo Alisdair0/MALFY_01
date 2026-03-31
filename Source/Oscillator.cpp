@@ -110,20 +110,34 @@ void Oscillator::initWaveform(int waveformIndex)
     }
 }
 
-void Oscillator::processWithFM(juce::AudioBuffer<float>& buffer,
+void Oscillator::processWithFM (juce::AudioBuffer<float>& buffer,
                                const float* fmBuffer,
                                float fmDepth)
 {
     auto numSamples = buffer.getNumSamples();
 
-    for (int i = 0; i < numSamples; ++i)
+    for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
     {
-        // true FM: change frequency BEFORE generating the sample
-        float freq = baseFrequency + fmBuffer[i] * fmDepth;
+        auto* out = buffer.getWritePointer(ch);
 
-        osc.setFrequency(freq, false);   // fast update, no smoothing
+        for (int i = 0; i < numSamples; ++i)
+        {
+            float mod = fmBuffer[i] * fmDepth;
 
-        float out = osc.processSample(0.0f);
-        buffer.setSample(0, i, out);
+            // clamp mod
+            mod = juce::jlimit(-1.0f, 1.0f, mod);
+
+            // scale modulation relative to base frequency
+            float freq = baseFrequency * (1.0f + mod * 0.01f);
+            freq = juce::jlimit(20.0f, 20000.0f, freq);
+
+            osc.setFrequency(freq);
+
+            out[i] = osc.processSample(0.0f);
+        }
     }
+
+    // apply gain after FM
+    juce::dsp::AudioBlock<float> block(buffer);
+    gain.process(juce::dsp::ProcessContextReplacing<float>(block));
 }

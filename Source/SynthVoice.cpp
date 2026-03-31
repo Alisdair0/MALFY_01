@@ -65,14 +65,14 @@ static float indexToSemitone(int index)
         case 2: return  0.f;
         case 3: return +7.f;
         case 4: return +12.f;
+        default: return  0.f;
     }
-    return 0.f;
 }
 
 //==============================================================================
 void SynthVoice::updateFromParameters(float gain1, float pitchIndex1, float detune1,
                                       float gain2, float pitchIndex2, float detune2,
-                                      float blendAmount)
+                                      float blendAmount, float fm1, float fm2)
 {
     float semis1 = indexToSemitone((int)pitchIndex1);
     float semis2 = indexToSemitone((int)pitchIndex2);
@@ -88,6 +88,9 @@ void SynthVoice::updateFromParameters(float gain1, float pitchIndex1, float detu
 
     osc1.setFrequency(baseFrequency * pitchRatio1 * detuneRatio1);
     osc2.setFrequency(baseFrequency * pitchRatio2 * detuneRatio2);
+
+    osc1FM = fm1;
+    osc2FM = fm2;
 
     blend = juce::jlimit(0.f, 1.f, blendAmount);
 }
@@ -113,6 +116,7 @@ void SynthVoice::updateFilter(float cutoff, float resonance, int type)
         case 0: filter.setType(juce::dsp::StateVariableTPTFilterType::lowpass);  break;
         case 1: filter.setType(juce::dsp::StateVariableTPTFilterType::highpass); break;
         case 2: filter.setType(juce::dsp::StateVariableTPTFilterType::bandpass); break;
+        default: break;
     }
 }
 
@@ -149,6 +153,7 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
     tempBuffer2.clear();
     mixBuffer.clear();
 
+    // First pass (no FM yet)
     osc1.process(tempBuffer1);
     osc2.process(tempBuffer2);
 
@@ -167,10 +172,18 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
             if (std::abs(s1) < 1e-6f) s1 = 0.0f;
             if (std::abs(s2) < 1e-6f) s2 = 0.0f;
 
-            float mixed = s1 * (1.0f - blend)
-                        + s2 * blend;
+            float g1 = std::cos(blend * juce::MathConstants<float>::halfPi);
+            float g2 = std::sin(blend * juce::MathConstants<float>::halfPi);
 
-            dst[i] = mixed * level;
+            float mixed = s1 * g1 + s2 * g2;
+
+            float fmComp = 1.0f / (1.0f + 0.5f * (osc1FM + osc2FM) * 0.01f);
+            mixed *= fmComp;
+
+            mixed *= level;
+
+            // soft clip
+            dst[i] = std::tanh(mixed);
         }
     }
 

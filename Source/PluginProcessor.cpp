@@ -108,9 +108,6 @@ void AudioPluginAudioProcessor::prepareToPlay (double sampleRate, int samplesPer
     masterGainParam = state.getRawParameterValue ("masterGain");
     pitchChoiceParam = state.getRawParameterValue ("pitchShift");
     panParam = state.getRawParameterValue ("pan");
-    osc1FmParam = state.getRawParameterValue ("osc1FM");
-    osc2FmParam = state.getRawParameterValue ("osc2FM");
-    fmAmountParam   = state.getRawParameterValue("fmAmount");
 
     // Envelopes
     attackParam  = state.getRawParameterValue ("attack");
@@ -129,7 +126,7 @@ void AudioPluginAudioProcessor::prepareToPlay (double sampleRate, int samplesPer
     osc1PitchParam  = state.getRawParameterValue("osc1Pitch");
     osc1DetuneParam = state.getRawParameterValue("osc1Detune");
     osc1GainParam   = state.getRawParameterValue("osc1Gain");
-    osc1FmParam     = state.getRawParameterValue("osc1FM");
+    osc1FMParam   = state.getRawParameterValue("osc1FM");
 
     // osc 2
     osc2OnParam     = state.getRawParameterValue("osc2On");
@@ -137,7 +134,7 @@ void AudioPluginAudioProcessor::prepareToPlay (double sampleRate, int samplesPer
     osc2PitchParam  = state.getRawParameterValue("osc2Pitch");
     osc2DetuneParam = state.getRawParameterValue("osc2Detune");
     osc2GainParam   = state.getRawParameterValue("osc2Gain");
-    osc2FmParam     = state.getRawParameterValue("osc2FM");
+    osc2FMParam   = state.getRawParameterValue("osc2FM");
 
     // blend
     blendParam      = state.getRawParameterValue("oscBlend");
@@ -181,25 +178,6 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 
     buffer.clear();
 
-    // Read all Osc Params
-
-    auto* osc1OnParam   = state.getRawParameterValue("osc1On");
-    auto* osc2OnParam   = state.getRawParameterValue("osc2On");
-
-    auto* osc1WaveParam = state.getRawParameterValue("osc1Wave");
-    auto* osc2WaveParam = state.getRawParameterValue("osc2Wave");
-
-    auto* osc1PitchParam = state.getRawParameterValue("osc1Pitch");
-    auto* osc2PitchParam = state.getRawParameterValue("osc2Pitch");
-
-    auto* osc1DetuneParam = state.getRawParameterValue("osc1Detune");
-    auto* osc2DetuneParam = state.getRawParameterValue("osc2Detune");
-
-    auto* osc1GainParam = state.getRawParameterValue("osc1Gain");
-    auto* osc2GainParam = state.getRawParameterValue("osc2Gain");
-
-    auto* blendParam = state.getRawParameterValue("oscBlend");
-
     // ===================== ADSR / FILTER / GLOBAL ===================== //
 
     float attack  = *state.getRawParameterValue("attack");
@@ -233,6 +211,9 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     float gain1   = osc1GainParam   ? osc1GainParam->load()   : 0.8f;
     float gain2   = osc2GainParam   ? osc2GainParam->load()   : 0.8f;
 
+    float osc1FM = osc1FMParam ? osc1FMParam->load() : 0.0f;
+    float osc2FM = osc2FMParam ? osc2FMParam->load() : 0.0f;
+
     float blend   = blendParam      ? blendParam->load()      : 0.5f;
 
     // ===================== UPDATE ALL VOICES ===================== //
@@ -249,9 +230,10 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 
             // pitch, detune, gain for each oscillator
             v->updateFromParameters(
-                gain1, pitch1, detune1,   // osc1 params
-                gain2, pitch2, detune2,   // osc2 params
-                blend                     // blend
+                gain1, (float)pitch1, detune1,
+                gain2, (float)pitch2, detune2,
+                blend,
+                osc1FM, osc2FM
             );
 
             // envelopes + filters
@@ -421,6 +403,9 @@ juce::AudioProcessorValueTreeState::ParameterLayout AudioPluginAudioProcessor::c
     params.push_back(std::make_unique<AudioParameterFloat>(
         "osc1Gain", "OSC1 Gain", 0.f, 1.f, 0.8f));
 
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+    "osc1FM", "OSC1 FM", 0.0f, 100.0f, 0.0f));
+
     // ========== OSC2 ========== //
     params.push_back(std::make_unique<AudioParameterBool>(
         "osc2On", "OSC2 On", true));
@@ -438,6 +423,9 @@ juce::AudioProcessorValueTreeState::ParameterLayout AudioPluginAudioProcessor::c
 
     params.push_back(std::make_unique<AudioParameterFloat>(
         "osc2Gain", "OSC2 Gain", 0.f, 1.f, 0.8f));
+
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+    "osc2FM", "OSC2 FM", 0.0f, 100.0f, 0.0f));
 
     // ========== BLEND ========== //
     params.push_back(std::make_unique<AudioParameterFloat>(

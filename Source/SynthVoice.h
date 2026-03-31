@@ -30,13 +30,12 @@ public:
     // ===== Runtime parameter updates =====
     void updateFromParameters (float gain1, float pitchIndex1, float detune1,
                                float gain2, float pitchIndex2, float detune2,
-                               float blendAmount);
+                               float blendAmount, float fm1, float fm2);
 
     void updateEnvelope (float attack, float decay, float sustain, float release);
     void updateFilter (float cutoff, float resonance, int type);
     void updateOscillators (int wave1, int wave2, float blendAmount);
     void updateOscOnOff (bool o1, bool o2);
-    void updateFM (float fm1Amount, float fm2Amount);
 
 private:
     Oscillator osc1, osc2;
@@ -56,8 +55,10 @@ private:
     bool osc1On = true;
     bool osc2On = true;
 
-    float fm1 = 0.0f;
-    float fm2 = 0.0f;
+    float osc1FM = 0.0f;
+    float osc2FM = 0.0f;
+    float gain1;
+    float gain2;
     float blend = 0.5f;
 };
 

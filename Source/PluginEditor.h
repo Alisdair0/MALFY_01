@@ -10,7 +10,7 @@ class WaveformDisplay : public juce::Component,
                         private juce::Timer
 {
 public:
-    WaveformDisplay(AudioPluginAudioProcessor& p);
+    explicit WaveformDisplay(AudioPluginAudioProcessor& p);
 
     void paint(juce::Graphics& g) override;
     void resized() override {}

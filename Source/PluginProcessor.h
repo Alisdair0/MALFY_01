@@ -1,7 +1,6 @@
 #pragma once
 
 #include <juce_audio_processors/juce_audio_processors.h>
-#include "Oscillator.h"
 #include "SynthVoice.h"
 #include "SynthSound.h"
 
@@ -57,13 +56,14 @@ public:
     // Call this for each sample to feed the oscilloscope
     inline void pushNextSampleIntoScope(float sample)
     {
-        int index = scopeWritePos.load(std::memory_order_relaxed);
+        auto index = static_cast<std::size_t>(
+            scopeWritePos.load(std::memory_order_relaxed));
 
         scopeData[index] = sample;
 
         index = (index + 1) % scopeSize;
 
-        scopeWritePos.store(index, std::memory_order_relaxed);
+        scopeWritePos.store(static_cast<int>(index), std::memory_order_relaxed);
     }
 
 private:
@@ -95,7 +95,7 @@ private:
 
     // Connection between processor & editor
     juce::AudioProcessorValueTreeState state;
-    juce::AudioProcessorValueTreeState::ParameterLayout createParameters();
+    static juce::AudioProcessorValueTreeState::ParameterLayout createParameters();
 
     // OSC1 parameters
     std::atomic<float>* osc1OnParam      = nullptr;
@@ -103,7 +103,7 @@ private:
     std::atomic<float>* osc1PitchParam   = nullptr;
     std::atomic<float>* osc1DetuneParam  = nullptr;
     std::atomic<float>* osc1GainParam    = nullptr;
-    std::atomic<float>* osc1FmParam      = nullptr;
+    std::atomic<float>* osc1FMParam      = nullptr;
 
     // OSC2 parameters
     std::atomic<float>* osc2OnParam      = nullptr;
@@ -111,7 +111,7 @@ private:
     std::atomic<float>* osc2PitchParam   = nullptr;
     std::atomic<float>* osc2DetuneParam  = nullptr;
     std::atomic<float>* osc2GainParam    = nullptr;
-    std::atomic<float>* osc2FmParam      = nullptr;
+    std::atomic<float>* osc2FMParam      = nullptr;
 
     // Blend
     std::atomic<float>* blendParam       = nullptr;
