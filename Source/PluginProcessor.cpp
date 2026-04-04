@@ -180,41 +180,41 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 
     // ===================== ADSR / FILTER / GLOBAL ===================== //
 
-    float attack  = *state.getRawParameterValue("attack");
-    float decay   = *state.getRawParameterValue("decay");
-    float sustain = *state.getRawParameterValue("sustain");
-    float release = *state.getRawParameterValue("release");
+    float attack  = attackParam->load();
+    float decay   = decayParam->load();
+    float sustain = sustainParam->load();
+    float release = releaseParam->load();
 
-    float cutoff    = *state.getRawParameterValue("filterCutoff");
-    float resonance = *state.getRawParameterValue("filterResonance");
-    int   filterType= (int)*state.getRawParameterValue("filterType");
+    float cutoff    = filterCutoffParam->load();
+    float resonance = filterResonanceParam->load();
+    int filterType  = (int) filterTypeParam->load();
 
-    float pan = *state.getRawParameterValue("pan");
+    float pan = panParam->load();
 
     // ===================== MAP RAW PARAMETERS ===================== //
 
     // On/off (bool)
-    bool osc1On  = osc1OnParam ? (bool)*osc1OnParam : true;
-    bool osc2On  = osc2OnParam ? (bool)*osc2OnParam : true;
+    bool osc1On  = osc1OnParam->load();
+    bool osc2On  = osc2OnParam->load();
 
     // Waveforms (choice -> int)
-    int wave1 = osc1WaveParam ? (int) std::round(*osc1WaveParam) : 0;
-    int wave2 = osc2WaveParam ? (int) std::round(*osc2WaveParam) : 0;
+    int wave1 = (int) std::round(osc1WaveParam->load());
+    int wave2 = (int) std::round(osc2WaveParam->load());
 
     // Pitch (choice -> int)
-    int pitch1 = osc1PitchParam ? (int) std::round(*osc1PitchParam) : 4;  // index 4 = "0"
-    int pitch2 = osc2PitchParam ? (int) std::round(*osc2PitchParam) : 4;
+    int pitch1 = (int) std::round(osc1PitchParam->load());
+    int pitch2 = (int) std::round(osc2PitchParam->load());
 
-    float detune1 = osc1DetuneParam ? osc1DetuneParam->load() : 0.0f;
-    float detune2 = osc2DetuneParam ? osc2DetuneParam->load() : 0.0f;
+    float detune1 = osc1DetuneParam->load();
+    float detune2 = osc2DetuneParam->load();
 
-    float gain1   = osc1GainParam   ? osc1GainParam->load()   : 0.8f;
-    float gain2   = osc2GainParam   ? osc2GainParam->load()   : 0.8f;
+    float gain1 = osc1GainParam->load();
+    float gain2 = osc2GainParam->load();
 
-    float osc1FM = osc1FMParam ? osc1FMParam->load() : 0.0f;
-    float osc2FM = osc2FMParam ? osc2FMParam->load() : 0.0f;
+    float osc1FM = osc1FMParam->load();
+    float osc2FM = osc2FMParam->load();
 
-    float blend   = blendParam      ? blendParam->load()      : 0.5f;
+    float blend = blendParam->load();
 
     // ===================== UPDATE ALL VOICES ===================== //
 
@@ -223,7 +223,7 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         if (auto* v = dynamic_cast<SynthVoice*>(synth.getVoice(i)))
         {
             // waveforms + blend
-            v->updateOscillators(wave1, wave2, blend);
+            v->updateOscillators(wave1, wave2);
 
             // oscillator on/off states
             v->updateOscOnOff(osc1On, osc2On);
@@ -248,12 +248,12 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 
     // ===================== PAN ===================== //
 
+    const float angle = (pan + 1.0f) * juce::MathConstants<float>::halfPi * 0.5f;
+    float leftGain  = std::cos(angle);
+    float rightGain = std::sin(angle);
+
     if (buffer.getNumChannels() >= 2)
     {
-        const float angle = (pan + 1.0f) * juce::MathConstants<float>::halfPi * 0.5f;
-        float leftGain  = std::cos(angle);
-        float rightGain = std::sin(angle);
-
         auto* left  = buffer.getWritePointer(0);
         auto* right = buffer.getWritePointer(1);
 
@@ -275,19 +275,12 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         buffer.clear();
 
     // ===================== VISUALIZER ======================= //
-    auto* read = buffer.getReadPointer(0);
-    for (int i = 0; i < buffer.getNumSamples(); ++i)
-        pushNextSampleIntoScope(read[i]);
-
-    for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
+    if (buffer.getNumChannels() > 0)
     {
-        auto* data = buffer.getReadPointer(ch);
+        auto* data = buffer.getReadPointer(0);
+
         for (int i = 0; i < buffer.getNumSamples(); ++i)
-        {
-            // Use channel 0 or the average — here we use CH0:
-            if (ch == 0)
-                pushNextSampleIntoScope(data[i]);
-        }
+            pushNextSampleIntoScope(data[i]);
     }
 }
 

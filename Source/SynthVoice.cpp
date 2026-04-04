@@ -60,11 +60,11 @@ static float indexToSemitone(int index)
 {
     switch (index)
     {
-        case 0: return -12.f;
-        case 1: return -7.f;
+        case 0: return +12.f;
+        case 1: return +7.f;
         case 2: return  0.f;
-        case 3: return +7.f;
-        case 4: return +12.f;
+        case 3: return -7.f;
+        case 4: return -12.f;
         default: return  0.f;
     }
 }
@@ -83,11 +83,14 @@ void SynthVoice::updateFromParameters(float gain1, float pitchIndex1, float detu
     float detuneRatio1 = std::pow(2.f, detune1 / 1200.f);
     float detuneRatio2 = std::pow(2.f, detune2 / 1200.f);
 
-    osc1.setGain(gain1);
-    osc2.setGain(gain2);
+    osc1Gain = gain1;
+    osc2Gain = gain2;
 
-    osc1.setFrequency(baseFrequency * pitchRatio1 * detuneRatio1);
-    osc2.setFrequency(baseFrequency * pitchRatio2 * detuneRatio2);
+    osc1BaseFreq = baseFrequency * pitchRatio1 * detuneRatio1;
+    osc2BaseFreq = baseFrequency * pitchRatio2 * detuneRatio2;
+
+    osc1.setFrequency(osc1BaseFreq);
+    osc2.setFrequency(osc2BaseFreq);
 
     osc1FM = fm1;
     osc2FM = fm2;
@@ -121,12 +124,10 @@ void SynthVoice::updateFilter(float cutoff, float resonance, int type)
 }
 
 //==============================================================================
-void SynthVoice::updateOscillators(int wave1, int wave2, float blendAmount)
+void SynthVoice::updateOscillators(int wave1, int wave2)
 {
     osc1.setWaveform(wave1);
     osc2.setWaveform(wave2);
-
-    blend = juce::jlimit(0.f, 1.f, blendAmount);
 }
 
 void SynthVoice::updateOscOnOff(bool o1, bool o2)
@@ -145,56 +146,49 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
 
     const int numChannels = outputBuffer.getNumChannels();
 
-    tempBuffer1.setSize(numChannels, numSamples, false, false, true);
-    tempBuffer2.setSize(numChannels, numSamples, false, false, true);
-    mixBuffer  .setSize(numChannels, numSamples, false, false, true);
-
-    tempBuffer1.clear();
-    tempBuffer2.clear();
+    mixBuffer.setSize(numChannels, numSamples, false, false, true);
     mixBuffer.clear();
 
-    // First pass (no FM yet)
-    osc1.process(tempBuffer1);
-    osc2.process(tempBuffer2);
+    // float g1 = std::cos(blend * juce::MathConstants<float>::halfPi);
+    // float g2 = std::sin(blend * juce::MathConstants<float>::halfPi);
 
-    for (int ch = 0; ch < numChannels; ++ch)
+    for (int i = 0; i < numSamples; ++i)
     {
-        auto* dst = mixBuffer.getWritePointer(ch);
-        auto* o1  = tempBuffer1.getReadPointer(ch);
-        auto* o2  = tempBuffer2.getReadPointer(ch);
+        // osc2 is the modulator
+        float modSample = osc2On ? osc2.processSample(0.0f) : 0.0f;
 
-        for (int i = 0; i < numSamples; ++i)
-        {
-            float s1 = osc1On ? o1[i] : 0.0f;
-            float s2 = osc2On ? o2[i] : 0.0f;
+        float fmAmount = osc1FM * 0.2f;   // converts 0..100 to 0..1
 
-            // Absolute mute if gain is too low (prevents saw bleed)
-            if (std::abs(s1) < 1e-6f) s1 = 0.0f;
-            if (std::abs(s2) < 1e-6f) s2 = 0.0f;
+        // If osc1FM is 0..100, this gives 0..30 Hz
+        float fmDepthHz = osc1BaseFreq * fmAmount * 0.25f;
 
-            float g1 = std::cos(blend * juce::MathConstants<float>::halfPi);
-            float g2 = std::sin(blend * juce::MathConstants<float>::halfPi);
+        // modulate osc1 around its base frequency
+        float currentFreq = osc1BaseFreq + (modSample * fmDepthHz);
 
-            float mixed = s1 * g1 + s2 * g2;
+        // adjust to ensure freq doesn't go too low
+        currentFreq = juce::jlimit(40.0f, 12000.0f, currentFreq);
 
-            float fmComp = 1.0f / (1.0f + 0.5f * (osc1FM + osc2FM) * 0.01f);
-            mixed *= fmComp;
+        osc1.setFrequency(currentFreq);
 
-            mixed *= level;
+        // generate audio samples
+        float s1 = osc1On ? osc1.processSample(0.0f) * osc1Gain : 0.0f;
+        //float s2 = osc2On ? modSample * osc2Gain : 0.0f;
 
-            // soft clip
-            dst[i] = std::tanh(mixed);
-        }
+        float out = s1 * level * 0.3f;
+
+        //float mixed = (s1 * g1 + s2 * g2) * level;
+        //float clipped = std::tanh(mixed);
+        //float clipped = mixed;
+
+        for (int ch = 0; ch < numChannels; ++ch)
+            mixBuffer.setSample(ch, i, out);
     }
 
-    // Apply envelope
     adsr.applyEnvelopeToBuffer(mixBuffer, 0, numSamples);
 
-    // Filter
     juce::dsp::AudioBlock<float> block(mixBuffer);
     filter.process(juce::dsp::ProcessContextReplacing<float>(block));
 
-    // Add to output buffer
     for (int ch = 0; ch < numChannels; ++ch)
     {
         auto* dst = outputBuffer.getWritePointer(ch, startSample);
@@ -210,3 +204,4 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
         clearCurrentNote();
     }
 }
+

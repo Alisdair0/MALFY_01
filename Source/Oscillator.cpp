@@ -9,7 +9,6 @@ void Oscillator::prepare(double sampleRate, int samplesPerBlock, int channels)
     spec.numChannels = channels;
 
     osc.prepare(spec);
-    gain.prepare(spec);
 
     // Default waveform
     initWaveform(0);
@@ -24,18 +23,12 @@ void Oscillator::process(juce::AudioBuffer<float>& buffer)
     juce::dsp::ProcessContextReplacing<float> context(audioBlock);
 
     osc.process(context);
-    gain.process(context);
 }
 
 void Oscillator::setFrequency(float freq)
 {
     baseFrequency = freq;        // store the frequency so FM can modify it later
     osc.setFrequency(freq, true); // true = no smoothing
-}
-
-void Oscillator::setGain(float newGain)
-{
-    gain.setGainLinear(newGain);
 }
 
 void Oscillator::setWaveform(int type)
@@ -122,22 +115,20 @@ void Oscillator::processWithFM (juce::AudioBuffer<float>& buffer,
 
         for (int i = 0; i < numSamples; ++i)
         {
-            float mod = fmBuffer[i] * fmDepth;
+            float mod = fmBuffer[i];
 
-            // clamp mod
-            mod = juce::jlimit(-1.0f, 1.0f, mod);
+            float freqOffset = mod * fmDepth * baseFrequency;
+            float freq = baseFrequency + freqOffset;
 
-            // scale modulation relative to base frequency
-            float freq = baseFrequency * (1.0f + mod * 0.01f);
             freq = juce::jlimit(20.0f, 20000.0f, freq);
 
-            osc.setFrequency(freq);
-
-            out[i] = osc.processSample(0.0f);
+            if (i % 4 == 0) // update every 4 samples
+                osc.setFrequency(freq, false);
         }
     }
+}
 
-    // apply gain after FM
-    juce::dsp::AudioBlock<float> block(buffer);
-    gain.process(juce::dsp::ProcessContextReplacing<float>(block));
+float Oscillator::processSample(float input)
+{
+    return osc.processSample(input);
 }
