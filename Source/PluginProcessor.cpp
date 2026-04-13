@@ -1,5 +1,6 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
+#include "SynthSound.h"
 #include <cmath>
 
 //==============================================================================
@@ -190,7 +191,6 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     int filterType  = (int) filterTypeParam->load();
 
     float pan = panParam->load();
-    auto* osc1OnParam = state.getRawParameterValue("osc1On");
 
     // ===================== MAP RAW PARAMETERS ===================== //
 

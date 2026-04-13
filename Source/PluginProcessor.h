@@ -2,7 +2,6 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "SynthVoice.h"
-#include "SynthSound.h"
 
 //==============================================================================
 class AudioPluginAudioProcessor final : public juce::AudioProcessor

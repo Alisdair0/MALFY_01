@@ -1,12 +1,14 @@
 #include "Oscillator.h"
 
-Oscillator::Oscillator() {}
+Oscillator::Oscillator()
+    : spec{}
+{}
 
 void Oscillator::prepare(double sampleRate, int samplesPerBlock, int channels)
 {
     spec.sampleRate = sampleRate;
-    spec.maximumBlockSize = samplesPerBlock;
-    spec.numChannels = channels;
+    spec.maximumBlockSize = static_cast<uint32_t>(samplesPerBlock);
+    spec.numChannels = static_cast<juce::uint32>(channels);
 
     osc.prepare(spec);
 
@@ -111,8 +113,6 @@ void Oscillator::processWithFM (juce::AudioBuffer<float>& buffer,
 
     for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
     {
-        auto* out = buffer.getWritePointer(ch);
-
         for (int i = 0; i < numSamples; ++i)
         {
             float mod = fmBuffer[i];

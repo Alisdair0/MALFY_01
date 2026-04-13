@@ -20,7 +20,6 @@ void WaveformDisplay::paint(juce::Graphics& g) {
     auto bounds = getLocalBounds().toFloat();
     auto width  = bounds.getWidth();
     auto height = bounds.getHeight();
-    auto centreY = height * 0.5f;
 
     auto& data = processor.scopeData;
     int writePos = processor.scopeWritePos.load();
@@ -45,13 +44,13 @@ void WaveformDisplay::paint(juce::Graphics& g) {
     }
 
     juce::Path p;
-    p.startNewSubPath(0.0f, getHeight() / 2.0f);
+    p.startNewSubPath(0.0f, static_cast<float>(getHeight()) / 2.0f);
 
     for (int i = 0; i < AudioPluginAudioProcessor::scopeSize; ++i)
     {
-        int index = (writePos + i) % AudioPluginAudioProcessor::scopeSize;
+        auto index = (writePos + i) % AudioPluginAudioProcessor::scopeSize;
         float x = juce::jmap((float)i, 0.f, (float)AudioPluginAudioProcessor::scopeSize - 1, 0.f, (float)getWidth());
-        float y = juce::jmap(juce::jlimit(-1.0f, 1.0f, data[index] * 2.5f),
+        float y = juce::jmap(juce::jlimit(-1.0f, 1.0f, data[static_cast<size_t>(index)] * 2.5f),
                      -1.f, 1.f,
                      (float)getHeight() - 6.0f,
                      6.0f);
@@ -111,7 +110,7 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
     addAndMakeVisible(adsrLabel);
 
     attackSlider.setSliderStyle(juce::Slider::LinearVertical);
-    attackSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 20);
+    attackSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 70, 20);
     addAndMakeVisible(attackSlider);
     addAndMakeVisible(attackLabel);
 
@@ -120,7 +119,7 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
             state, "attack", attackSlider);
 
     decaySlider.setSliderStyle(juce::Slider::LinearVertical);
-    decaySlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 20);
+    decaySlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 70, 20);
     addAndMakeVisible(decaySlider);
     addAndMakeVisible(decayLabel);
 
@@ -129,7 +128,7 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
             state, "decay", decaySlider);
 
     sustainSlider.setSliderStyle(juce::Slider::LinearVertical);
-    sustainSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 20);
+    sustainSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 70, 20);
     addAndMakeVisible(sustainSlider);
     addAndMakeVisible(sustainLabel);
 
@@ -138,7 +137,7 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
             state, "sustain", sustainSlider);
 
     releaseSlider.setSliderStyle(juce::Slider::LinearVertical);
-    releaseSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 20);
+    releaseSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 70, 20);
     addAndMakeVisible(releaseSlider);
     addAndMakeVisible(releaseLabel);
 
@@ -393,15 +392,6 @@ void AudioPluginAudioProcessorEditor::resized() {
     const int waveformBottomGap = 15;
     auto area = getLocalBounds();
 
-    auto layoutColumn = [] (juce::Rectangle<int> area,
-                        std::vector<juce::Component*> comps)
-    {
-        int h = area.getHeight() / (int) comps.size();
-
-        for (auto* c : comps)
-            c->setBounds(area.removeFromTop(h).reduced(2));
-    };
-
     // Split Window
     auto topArea = area.removeFromTop(area.getHeight() / 2);
     topArea.removeFromBottom(waveformBottomGap);
@@ -429,7 +419,8 @@ void AudioPluginAudioProcessorEditor::resized() {
     auto osc = oscArea.reduced(10);
 
     // Split vertically (OSC1 on top, OSC2 below)
-    auto osc1Area = osc.removeFromTop(osc.getHeight() / 2);
+    auto osc1Area = osc.removeFromTop(static_cast<int>(osc.getHeight() / 1.5));
+    osc.removeFromTop(10);
     auto osc2Area = osc;
 
     // ---------- OSC 1 ----------
@@ -453,19 +444,20 @@ void AudioPluginAudioProcessorEditor::resized() {
         osc1WaveLabel.setBounds(boxLabels.removeFromLeft(bL));
         osc1PitchLabel.setBounds(boxLabels);
 
-        auto sliders = osc1Area.removeFromTop(100);
+        auto labelSpace = osc1Area.removeFromBottom(24);
+
+        auto sliders = osc1Area.removeFromTop(140);
         int w = sliders.getWidth() / 3;
 
         detune1Slider.setBounds(sliders.removeFromLeft(w).reduced(5));
         gain1Slider.setBounds(sliders.removeFromLeft(w).reduced(5));
         fm1Slider.setBounds(sliders.reduced(5));
 
-        auto labels = osc1Area.removeFromTop(24);
-        int wL = labels.getWidth() / 3;
+        int wL = labelSpace.getWidth() / 3;
 
-        osc1DetuneLabel.setBounds(labels.removeFromLeft(wL));
-        osc1GainLabel.setBounds(labels.removeFromLeft(wL));
-        osc1FmLabel.setBounds(labels);
+        osc1DetuneLabel.setBounds(labelSpace.removeFromLeft(wL));
+        osc1GainLabel.setBounds(labelSpace.removeFromLeft(wL));
+        osc1FmLabel.setBounds(labelSpace);
     }
 
     // ---------- OSC 2 ----------

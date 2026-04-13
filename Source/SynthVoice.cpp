@@ -5,6 +5,10 @@
 #include "SynthVoice.h"
 #include "SynthSound.h"
 
+SynthVoice::SynthVoice()
+    : filterSpec{}
+{}
+
 //==============================================================================
 bool SynthVoice::canPlaySound (juce::SynthesiserSound* sound)
 {
@@ -20,8 +24,8 @@ void SynthVoice::prepare (double sampleRate, int samplesPerBlock, int numChannel
     adsr.setSampleRate(sampleRate);
 
     filterSpec.sampleRate = sampleRate;
-    filterSpec.maximumBlockSize = samplesPerBlock;
-    filterSpec.numChannels = numChannels;
+    filterSpec.maximumBlockSize = static_cast<uint32_t>(samplesPerBlock);
+    filterSpec.numChannels = static_cast<juce::uint32>(numChannels);
     filter.prepare(filterSpec);
 
     filter.setType(juce::dsp::StateVariableTPTFilterType::lowpass);
@@ -31,7 +35,7 @@ void SynthVoice::prepare (double sampleRate, int samplesPerBlock, int numChannel
 void SynthVoice::startNote (int midiNoteNumber, float velocity,
                             juce::SynthesiserSound*, int)
 {
-    baseFrequency = juce::MidiMessage::getMidiNoteInHertz(midiNoteNumber);
+    baseFrequency = static_cast<float>(juce::MidiMessage::getMidiNoteInHertz(midiNoteNumber));
     level = velocity;
 
     osc1.reset();
@@ -74,8 +78,8 @@ void SynthVoice::updateFromParameters(float gain1, float pitchIndex1, float detu
                                       float gain2, float pitchIndex2, float detune2,
                                       float blendAmount, float fm1, float fm2)
 {
-    float semis1 = indexToSemitone((int)pitchIndex1);
-    float semis2 = indexToSemitone((int)pitchIndex2);
+    float semis1 = indexToSemitone(static_cast<int>(pitchIndex1));
+    float semis2 = indexToSemitone(static_cast<int>(pitchIndex2));
 
     float pitchRatio1  = std::pow(2.f, semis1 / 12.f);
     float pitchRatio2  = std::pow(2.f, semis2 / 12.f);

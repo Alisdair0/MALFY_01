@@ -13,7 +13,7 @@
 class SynthVoice : public juce::SynthesiserVoice
 {
 public:
-    SynthVoice() = default;
+    SynthVoice();
 
     // ===== JUCE-required overrides =====
     bool canPlaySound (juce::SynthesiserSound* sound) override;
