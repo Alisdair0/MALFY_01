@@ -130,10 +130,9 @@ void SynthVoice::updateOscillators(int wave1, int wave2)
     osc2.setWaveform(wave2);
 }
 
-void SynthVoice::updateOscOnOff(bool o1, bool o2)
+void SynthVoice::updateOscOnOff(bool o1)
 {
     osc1On = o1;
-    osc2On = o2;
 }
 
 //==============================================================================
@@ -154,19 +153,29 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
 
     for (int i = 0; i < numSamples; ++i)
     {
-        // osc2 is the modulator
-        float modSample = osc2On ? osc2.processSample(0.0f) : 0.0f;
+        // // osc2 is the modulator
+        // float modSample = osc2On ? osc2.processSample(0.0f) : 0.0f;
+        //
+        // float fmAmount = osc1FM * 0.2f;
+        //
+        // float fmDepthHz = osc1BaseFreq * fmAmount * 0.25f;
+        //
+        // // modulate osc1 around its base frequency
+        // float currentFreq = osc1BaseFreq + (modSample * fmDepthHz);
+        //
+        // // adjust to ensure freq doesn't go too low
+        // currentFreq = juce::jlimit(1.0f, 20000.0f, currentFreq);
 
-        float fmAmount = osc1FM * 0.2f;   // converts 0..100 to 0..1
+        float modSample =  osc2.processSample(0.0f);
 
-        // If osc1FM is 0..100, this gives 0..30 Hz
-        float fmDepthHz = osc1BaseFreq * fmAmount * 0.25f;
+        // FM index style scaling
+        float fmIndex = osc1FM / 100.0f;
 
-        // modulate osc1 around its base frequency
+        // stronger deviation based on modulator frequency
+        float fmDepthHz = osc2BaseFreq * fmIndex * 4.0f;
+
         float currentFreq = osc1BaseFreq + (modSample * fmDepthHz);
-
-        // adjust to ensure freq doesn't go too low
-        currentFreq = juce::jlimit(40.0f, 12000.0f, currentFreq);
+        currentFreq = juce::jlimit(1.0f, 20000.0f, currentFreq);
 
         osc1.setFrequency(currentFreq);
 

@@ -65,6 +65,7 @@ private:
     // ADSR sliders + labels
     juce::Slider attackSlider, decaySlider, sustainSlider, releaseSlider;
 
+    juce::Label adsrLabel;
     juce::Label attackLabel  { "attackLabel",  "Attack" };
     juce::Label decayLabel   { "decayLabel",   "Decay" };
     juce::Label sustainLabel { "sustainLabel", "Sustain" };
@@ -91,6 +92,7 @@ private:
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> resonanceAttachment;
 
     // OSC1
+    juce::ToggleButton osc1OnButton;
     juce::ComboBox osc1WaveBox;
     juce::ComboBox osc1PitchBox;
     juce::Slider   detune1Slider;
@@ -98,6 +100,7 @@ private:
     juce::Slider   fm1Slider;
 
     // OSC1 attachments
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> osc1OnAttachment;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> osc1WaveAttachment;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> osc1PitchAttachment;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment>   osc1DetuneAttachment;
@@ -105,6 +108,7 @@ private:
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment>   osc1FmAttachment;
 
     // OSC1 labels
+    juce::Label carrierLabel;
     juce::Label osc1GainLabel      { "osc1GainLabel",      "Gain" };
     juce::Label osc1DetuneLabel    { "osc1DetuneLabel",    "Detune" };
     juce::Label osc1FmLabel        { "osc1FmLabel",        "FM" };
@@ -112,6 +116,7 @@ private:
     juce::Label osc1WaveLabel      { "osc1WaveLabel",      "Wave" };
 
     // OSC2
+    juce::ToggleButton osc2OnButton;
     juce::ComboBox osc2WaveBox;
     juce::ComboBox osc2PitchBox;
     juce::Slider   detune2Slider;
@@ -126,6 +131,7 @@ private:
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment>   osc2FmAttachment;
 
     // OSC2 labels
+    juce::Label modulatorLabel;
     juce::Label osc2GainLabel      { "osc2GainLabel",      "Gain" };
     juce::Label osc2DetuneLabel    { "osc2DetuneLabel",    "Detune" };
     juce::Label osc2FmLabel        { "osc2FmLabel",        "FM" };

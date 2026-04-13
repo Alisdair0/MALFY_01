@@ -35,7 +35,7 @@ public:
     void updateEnvelope (float attack, float decay, float sustain, float release);
     void updateFilter (float cutoff, float resonance, int type);
     void updateOscillators (int wave1, int wave2);
-    void updateOscOnOff (bool o1, bool o2);
+    void updateOscOnOff (bool o1);
 
 private:
     Oscillator osc1, osc2;
@@ -56,7 +56,6 @@ private:
     float osc2BaseFreq = 440.0f;
 
     bool osc1On = true;
-    bool osc2On = true;
 
     float osc1FM = 0.0f;
     float osc2FM = 0.0f;

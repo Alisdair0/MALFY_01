@@ -17,8 +17,32 @@ void WaveformDisplay::paint(juce::Graphics& g) {
     g.setColour(juce::Colours::slategrey);
     g.drawRect(0, 0, getWidth(), getHeight());
 
+    auto bounds = getLocalBounds().toFloat();
+    auto width  = bounds.getWidth();
+    auto height = bounds.getHeight();
+    auto centreY = height * 0.5f;
+
     auto& data = processor.scopeData;
     int writePos = processor.scopeWritePos.load();
+
+    // Subtle border
+    g.setColour(juce::Colours::slategrey.withAlpha(0.6f));
+    g.drawRect(bounds, 1.0f);
+
+    // Subtle grid
+    g.setColour(juce::Colours::dimgrey.withAlpha(0.18f));
+
+    for (int i = 1; i < 4; ++i)
+    {
+        float y = height * (float) i / 4.0f;
+        g.drawHorizontalLine((int) y, 0.0f, width);
+    }
+
+    for (int i = 1; i < 8; ++i)
+    {
+        float x = width * (float) i / 8.0f;
+        g.drawVerticalLine((int) x, 0.0f, height);
+    }
 
     juce::Path p;
     p.startNewSubPath(0.0f, getHeight() / 2.0f);
@@ -27,7 +51,10 @@ void WaveformDisplay::paint(juce::Graphics& g) {
     {
         int index = (writePos + i) % AudioPluginAudioProcessor::scopeSize;
         float x = juce::jmap((float)i, 0.f, (float)AudioPluginAudioProcessor::scopeSize - 1, 0.f, (float)getWidth());
-        float y = juce::jmap(data[index], -1.f, 1.f, (float)getHeight(), 0.f);
+        float y = juce::jmap(juce::jlimit(-1.0f, 1.0f, data[index] * 2.5f),
+                     -1.f, 1.f,
+                     (float)getHeight() - 6.0f,
+                     6.0f);
 
         if (i == 0)
             p.startNewSubPath(x, y);
@@ -35,8 +62,15 @@ void WaveformDisplay::paint(juce::Graphics& g) {
             p.lineTo(x, y);
     }
 
-    g.setColour(juce::Colours::orange);
-    g.strokePath(p, juce::PathStrokeType(2.0f));
+    // Glow layers
+    g.setColour(juce::Colours::yellow.withAlpha(0.10f));
+    g.strokePath(p, juce::PathStrokeType(10.0f));
+
+    g.setColour(juce::Colours::orange.withAlpha(0.25f));
+    g.strokePath(p, juce::PathStrokeType(6.0f));
+
+    g.setColour(juce::Colours::orange.withAlpha(0.95f));
+    g.strokePath(p, juce::PathStrokeType(2.2f));
 }
 
 void WaveformDisplay::timerCallback()
@@ -55,15 +89,6 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
 
     addAndMakeVisible(waveformDisplay);
 
-    // =========== //
-    // PLAY BUTTON //
-    // =========== //
-
-    addAndMakeVisible (playButton);
-    playAttachment = std::make_unique<
-        juce::AudioProcessorValueTreeState::ButtonAttachment>(
-            state, "play", playButton);
-
     // =============== //
     // GLOBAL CONTROLS //
     // =============== //
@@ -81,8 +106,12 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
     configureSliderTwoDecimals(masterGainSlider);
 
     // ADSR
+    adsrLabel.setText("Envelope", juce::dontSendNotification);
+    adsrLabel.setJustificationType(juce::Justification::centredLeft);
+    addAndMakeVisible(adsrLabel);
+
     attackSlider.setSliderStyle(juce::Slider::LinearVertical);
-    attackSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 40, 16);
+    attackSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 20);
     addAndMakeVisible(attackSlider);
     addAndMakeVisible(attackLabel);
 
@@ -91,7 +120,7 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
             state, "attack", attackSlider);
 
     decaySlider.setSliderStyle(juce::Slider::LinearVertical);
-    decaySlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 40, 16);
+    decaySlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 20);
     addAndMakeVisible(decaySlider);
     addAndMakeVisible(decayLabel);
 
@@ -100,7 +129,7 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
             state, "decay", decaySlider);
 
     sustainSlider.setSliderStyle(juce::Slider::LinearVertical);
-    sustainSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 40, 16);
+    sustainSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 20);
     addAndMakeVisible(sustainSlider);
     addAndMakeVisible(sustainLabel);
 
@@ -109,7 +138,7 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
             state, "sustain", sustainSlider);
 
     releaseSlider.setSliderStyle(juce::Slider::LinearVertical);
-    releaseSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 40, 16);
+    releaseSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 20);
     addAndMakeVisible(releaseSlider);
     addAndMakeVisible(releaseLabel);
 
@@ -161,6 +190,12 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
     // OSCILLATOR 1 //
     // ============ //
 
+    addAndMakeVisible(osc1OnButton);
+    osc1OnButton.setButtonText("On");
+
+    osc1OnAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(
+    state, "osc1On", osc1OnButton);
+
     osc1WaveBox.addItemList({ "Sine","Square","Saw","Triangle","Noise","Add1","Add2" }, 1);
     addAndMakeVisible(osc1WaveBox);
 
@@ -176,6 +211,14 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
     addAndMakeVisible(osc1FmLabel);
     addAndMakeVisible(osc1PitchLabel);
     addAndMakeVisible(osc1WaveLabel);
+
+    osc1GainLabel.setText("Gain", juce::dontSendNotification);
+    osc1DetuneLabel.setText("Detune", juce::dontSendNotification);
+    osc1FmLabel.setText("FM", juce::dontSendNotification);
+
+    carrierLabel.setText("Carrier", juce::dontSendNotification);
+    carrierLabel.setJustificationType(juce::Justification::centredLeft);
+    addAndMakeVisible(carrierLabel);
 
     detune1Slider.setSliderStyle(juce::Slider::LinearVertical);
     detune1Slider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 20);
@@ -213,6 +256,9 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
     // OSCILLATOR 2 //
     // ============ //
 
+    osc2OnButton.setButtonText("On");
+    addAndMakeVisible(osc2OnButton);
+
     osc2WaveBox.addItemList({ "Sine","Square","Saw","Triangle","Noise","Add1","Add2" }, 1);
     addAndMakeVisible(osc2WaveBox);
 
@@ -228,6 +274,9 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
     addAndMakeVisible(osc2FmLabel);
     addAndMakeVisible(osc2PitchLabel);
     addAndMakeVisible(osc2WaveLabel);
+    modulatorLabel.setText("Modulator", juce::dontSendNotification);
+    modulatorLabel.setJustificationType(juce::Justification::centredLeft);
+    addAndMakeVisible(modulatorLabel);
 
     detune2Slider.setSliderStyle(juce::Slider::LinearVertical);
     detune2Slider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 20);
@@ -385,8 +434,24 @@ void AudioPluginAudioProcessorEditor::resized() {
 
     // ---------- OSC 1 ----------
     {
-        auto top = osc1Area.removeFromTop(50);
-        layoutColumn(top, { &osc1WaveBox, &osc1PitchBox });
+        auto header = osc1Area.removeFromTop(20);
+
+        auto labelArea = header.removeFromLeft(header.getWidth() * 2 / 3);
+        carrierLabel.setBounds(labelArea);
+
+        osc1OnButton.setBounds(header.reduced(2));
+
+        auto top = osc1Area.removeFromTop(40);
+        int tW = top.getWidth() / 2;
+
+        osc1WaveBox.setBounds(top.removeFromLeft(tW).reduced(5));
+        osc1PitchBox.setBounds(top.reduced(5));
+
+        auto boxLabels = osc1Area.removeFromTop(10);
+        int bL = boxLabels.getWidth() / 2;
+
+        osc1WaveLabel.setBounds(boxLabels.removeFromLeft(bL));
+        osc1PitchLabel.setBounds(boxLabels);
 
         auto sliders = osc1Area.removeFromTop(100);
         int w = sliders.getWidth() / 3;
@@ -395,7 +460,7 @@ void AudioPluginAudioProcessorEditor::resized() {
         gain1Slider.setBounds(sliders.removeFromLeft(w).reduced(5));
         fm1Slider.setBounds(sliders.reduced(5));
 
-        auto labels = osc1Area.removeFromTop(20);
+        auto labels = osc1Area.removeFromTop(24);
         int wL = labels.getWidth() / 3;
 
         osc1DetuneLabel.setBounds(labels.removeFromLeft(wL));
@@ -405,22 +470,30 @@ void AudioPluginAudioProcessorEditor::resized() {
 
     // ---------- OSC 2 ----------
     {
-        auto top = osc2Area.removeFromTop(50);
-        layoutColumn(top, { &osc2WaveBox, &osc2PitchBox });
+        auto header = osc2Area.removeFromTop(20);
+        modulatorLabel.setBounds(header);
 
-        auto sliders = osc2Area.removeFromTop(100);
-        int w = sliders.getWidth() / 3;
+        auto top = osc2Area.removeFromTop(40);
+        int tW = top.getWidth() / 2;
 
-        detune2Slider.setBounds(sliders.removeFromLeft(w).reduced(5));
-        gain2Slider.setBounds(sliders.removeFromLeft(w).reduced(5));
-        fm2Slider.setBounds(sliders.reduced(5));
+        osc2WaveBox.setBounds(top.removeFromLeft(tW).reduced(5));
+        osc2PitchBox.setBounds(top.reduced(5));
 
-        auto labels = osc2Area.removeFromTop(20);
-        int wL = labels.getWidth() / 3;
+        auto boxLabels = osc2Area.removeFromTop(10);
+        int bL = boxLabels.getWidth() / 2;
 
-        osc2DetuneLabel.setBounds(labels.removeFromLeft(wL));
-        osc2GainLabel.setBounds(labels.removeFromLeft(wL));
-        osc2FmLabel.setBounds(labels);
+        osc2WaveLabel.setBounds(boxLabels.removeFromLeft(bL));
+        osc2PitchLabel.setBounds(boxLabels);
+
+        // auto sliders = osc2Area.removeFromTop(100);
+        // int w = sliders.getWidth() / 3;
+        //
+        // detune2Slider.setBounds(sliders.removeFromLeft(w).reduced(5));
+        //
+        // auto labels = osc2Area.removeFromTop(20);
+        // int wL = labels.getWidth() / 3;
+        //
+        // osc2DetuneLabel.setBounds(labels.removeFromLeft(wL));
     }
 
     // ADSR (yellow)
@@ -461,9 +534,4 @@ void AudioPluginAudioProcessorEditor::resized() {
     auto labelArea = filter.removeFromTop(20);
     cutoffLabel.setBounds(labelArea.removeFromLeft(labelArea.getWidth() / 2));
     resonanceLabel.setBounds(labelArea);
-
-    // Labels
-    auto filterLabels = filter.removeFromTop(20);
-    cutoffLabel.setBounds(filterLabels.removeFromLeft(filterLabels.getWidth() / 2));
-    resonanceLabel.setBounds(filterLabels);
 }

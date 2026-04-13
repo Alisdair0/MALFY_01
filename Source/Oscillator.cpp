@@ -53,8 +53,8 @@ void Oscillator::initWaveform(int waveformIndex)
         case 1: // Square
             osc.initialise([](float x)
             {
-                return (x < 0.0f ? -1.0f : 1.0f);
-            }, 2);
+                return std::sin(x) >= 0.0f ? 1.0f : -1.0f;
+            }, 128);
             break;
 
         case 2: // Saw

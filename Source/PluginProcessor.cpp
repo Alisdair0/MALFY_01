@@ -190,12 +190,12 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     int filterType  = (int) filterTypeParam->load();
 
     float pan = panParam->load();
+    auto* osc1OnParam = state.getRawParameterValue("osc1On");
 
     // ===================== MAP RAW PARAMETERS ===================== //
 
     // On/off (bool)
-    bool osc1On  = osc1OnParam->load();
-    bool osc2On  = osc2OnParam->load();
+    bool osc1On = osc1OnParam ? (bool)*osc1OnParam : true;
 
     // Waveforms (choice -> int)
     int wave1 = (int) std::round(osc1WaveParam->load());
@@ -226,7 +226,7 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
             v->updateOscillators(wave1, wave2);
 
             // oscillator on/off states
-            v->updateOscOnOff(osc1On, osc2On);
+            v->updateOscOnOff(osc1On);
 
             // pitch, detune, gain for each oscillator
             v->updateFromParameters(
@@ -329,9 +329,6 @@ juce::AudioProcessorValueTreeState::ParameterLayout AudioPluginAudioProcessor::c
     std::vector<std::unique_ptr<RangedAudioParameter>> params;
 
     // ======= GLOBAL SLIDERS & BUTTONS ====== //
-    params.push_back (std::make_unique<AudioParameterBool>(
-        "play", "Play", true));
-
     params.push_back (std::make_unique<AudioParameterFloat>(
     "masterGain", "Master Gain",
     NormalisableRange<float> (-60.0f, 0.0f, 0.01f),
@@ -344,12 +341,12 @@ juce::AudioProcessorValueTreeState::ParameterLayout AudioPluginAudioProcessor::c
     // ============== ADSR =================== //
     params.push_back (std::make_unique<AudioParameterFloat>(
         "attack", "Attack",
-        NormalisableRange<float> (0.001f, 5.0f, 0.0f, 0.5f),
+        NormalisableRange<float> (0.01f, 5.0f, 0.0f, 0.5f),
         0.01f));
 
     params.push_back (std::make_unique<AudioParameterFloat>(
         "decay", "Decay",
-        NormalisableRange<float> (0.001f, 5.0f, 0.0f, 0.5f),
+        NormalisableRange<float> (0.01f, 5.0f, 0.0f, 0.5f),
         0.1f));
 
     params.push_back (std::make_unique<AudioParameterFloat>(
@@ -359,7 +356,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout AudioPluginAudioProcessor::c
 
     params.push_back (std::make_unique<AudioParameterFloat>(
         "release", "Release",
-        NormalisableRange<float> (0.001f, 5.0f, 0.0f, 0.5f),
+        NormalisableRange<float> (0.01f, 5.0f, 0.0f, 0.5f),
         0.2f));
 
     // ========== FILTER CONTROLS ========== //
