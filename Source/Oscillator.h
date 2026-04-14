@@ -23,7 +23,8 @@ public:
 
     void reset();
 
-    void processWithFM (juce::AudioBuffer<float>& buffer, const float* fmBuffer, float fmDepth);
+    // Legacy FM approach every few samples
+    //void processWithFM (juce::AudioBuffer<float>& buffer, const float* fmBuffer, float fmDepth);
 
     float processSample(float input);
 

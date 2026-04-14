@@ -33,14 +33,14 @@ void WaveformDisplay::paint(juce::Graphics& g) {
 
     for (int i = 1; i < 4; ++i)
     {
-        float y = height * (float) i / 4.0f;
-        g.drawHorizontalLine((int) y, 0.0f, width);
+        float y = height * static_cast<float>(i) / 4.0f;
+        g.drawHorizontalLine(static_cast<int>(y), 0.0f, width);
     }
 
     for (int i = 1; i < 8; ++i)
     {
-        float x = width * (float) i / 8.0f;
-        g.drawVerticalLine((int) x, 0.0f, height);
+        float x = width * static_cast<float>(i) / 8.0f;
+        g.drawVerticalLine(static_cast<int>(x), 0.0f, height);
     }
 
     juce::Path p;
@@ -49,11 +49,18 @@ void WaveformDisplay::paint(juce::Graphics& g) {
     for (int i = 0; i < AudioPluginAudioProcessor::scopeSize; ++i)
     {
         auto index = (writePos + i) % AudioPluginAudioProcessor::scopeSize;
-        float x = juce::jmap((float)i, 0.f, (float)AudioPluginAudioProcessor::scopeSize - 1, 0.f, (float)getWidth());
-        float y = juce::jmap(juce::jlimit(-1.0f, 1.0f, data[static_cast<size_t>(index)] * 2.5f),
-                     -1.f, 1.f,
-                     (float)getHeight() - 6.0f,
-                     6.0f);
+
+        // check sourceRangeMin cast
+        float x = juce::jmap(static_cast<float>(i),
+            0.f, static_cast<float>(AudioPluginAudioProcessor::scopeSize - 1),
+            0.f,
+            static_cast<float>(getWidth()));
+        float y = juce::jmap(juce::jlimit(-1.0f,
+            1.0f,
+            data[static_cast<size_t>(index)] * 2.5f),
+            -1.f, 1.f,
+            static_cast<float>(getHeight()) - 6.0f,
+            6.0f);
 
         if (i == 0)
             p.startNewSubPath(x, y);
@@ -104,7 +111,10 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
     configureSliderTwoDecimals(detuneSlider);
     configureSliderTwoDecimals(masterGainSlider);
 
-    // ADSR
+    // ============== //
+    //    ENVELOPE    //
+    // ============== //
+
     adsrLabel.setText("Envelope", juce::dontSendNotification);
     adsrLabel.setJustificationType(juce::Justification::centredLeft);
     addAndMakeVisible(adsrLabel);
@@ -348,14 +358,15 @@ AudioPluginAudioProcessorEditor::~AudioPluginAudioProcessorEditor() = default;
 void AudioPluginAudioProcessorEditor::paint (juce::Graphics& g)
 {
     g.fillAll(juce::Colour(0xff1e1e1e));
-    const int numControls = 4;
-    const int margin = 10;
+    constexpr int numControls = 4;
+    constexpr int margin = 10;
     juce::Rectangle<int> area = (getLocalBounds());
     const int areaWidth = area.getWidth();
     const int areaHeight = area.getHeight() / 2;
     const int controlHeight = areaHeight - margin;
     const int rectangleWidth = (areaWidth - (margin * (numControls + 1))) / numControls;
 
+    // Red border
     juce::Rectangle<int> masterBorder;
     masterBorder.setBounds(margin, controlHeight, rectangleWidth, areaHeight);
     g.setColour(juce::Colours::darkred);
@@ -363,6 +374,7 @@ void AudioPluginAudioProcessorEditor::paint (juce::Graphics& g)
     g.setColour(juce::Colour(0xff001933));
     g.fillRect(masterBorder.toFloat());
 
+    // Blue border
     juce::Rectangle<int> oscBorder;
     oscBorder.setBounds((margin * 2) + rectangleWidth, controlHeight, rectangleWidth, areaHeight);
     g.setColour(juce::Colours::darkblue);
@@ -370,6 +382,7 @@ void AudioPluginAudioProcessorEditor::paint (juce::Graphics& g)
     g.setColour(juce::Colour(0xff28643C));
     g.fillRect(oscBorder.toFloat());
 
+    // Orange border
     juce::Rectangle<int> adsrBorder;
     adsrBorder.setBounds((margin * 3) + (rectangleWidth * 2), controlHeight, rectangleWidth, areaHeight);
     g.setColour(juce::Colours::darkorange);
@@ -377,8 +390,7 @@ void AudioPluginAudioProcessorEditor::paint (juce::Graphics& g)
     g.setColour(juce::Colour(0xff4C197F));
     g.fillRect(adsrBorder.toFloat());
 
-
-    // Cyan band border
+    // Cyan border
     juce::Rectangle<int> filterBorder;
     filterBorder.setBounds((margin * 4) + (rectangleWidth * 3), controlHeight, rectangleWidth, areaHeight);
     g.setColour(juce::Colours::darkcyan);
@@ -388,8 +400,8 @@ void AudioPluginAudioProcessorEditor::paint (juce::Graphics& g)
 }
 
 void AudioPluginAudioProcessorEditor::resized() {
-    const int margin = 10;
-    const int waveformBottomGap = 15;
+    constexpr int margin = 10;
+    constexpr int waveformBottomGap = 15;
     auto area = getLocalBounds();
 
     // Split Window
@@ -398,12 +410,12 @@ void AudioPluginAudioProcessorEditor::resized() {
     waveformDisplay.setBounds(topArea.reduced(margin));
 
     // Control Zone
-    const int numControls = 4;
+    constexpr int numControls = 4;
     const int areaWidth = area.getWidth();
     const int areaHeight = area.getHeight();
     const int rectangleWidth = (areaWidth - (margin * (numControls + 1))) / numControls;
 
-    // Recreate your 4 sections
+    // Divide 4 sections
     juce::Rectangle<int> masterArea (margin, area.getY(), rectangleWidth, areaHeight);
     juce::Rectangle<int> oscArea ((margin * 2) + rectangleWidth, area.getY(), rectangleWidth, areaHeight);
     juce::Rectangle<int> adsrArea ((margin * 3) + (rectangleWidth * 2), area.getY(), rectangleWidth, areaHeight);
@@ -418,7 +430,7 @@ void AudioPluginAudioProcessorEditor::resized() {
     // Oscillators (Blue)
     auto osc = oscArea.reduced(10);
 
-    // Split vertically (OSC1 on top, OSC2 below)
+    // Split Oscillators vertically
     auto osc1Area = osc.removeFromTop(static_cast<int>(osc.getHeight() / 1.5));
     osc.removeFromTop(10);
     auto osc2Area = osc;
@@ -511,18 +523,18 @@ void AudioPluginAudioProcessorEditor::resized() {
     // Filter (Cyan)
     auto filter = filterArea.reduced(10);
 
-    // Top controls (fixed small height)
+    // Top controls
     filterLabel.setBounds(filter.removeFromTop(20));
     filterType.setBounds(filter.removeFromTop(25));
 
-    // Give sliders a guaranteed size
+    // Clamp slider sizes
     auto sliderArea = filter.removeFromTop(140);
     int filterWidth = sliderArea.getWidth() / 2;
 
     cutoffSlider.setBounds(sliderArea.removeFromLeft(filterWidth).reduced(5));
     resonanceSlider.setBounds(sliderArea.reduced(5));
 
-    // Labels BELOW sliders (don’t steal slider space)
+    // Labels below
     auto labelArea = filter.removeFromTop(20);
     cutoffLabel.setBounds(labelArea.removeFromLeft(labelArea.getWidth() / 2));
     resonanceLabel.setBounds(labelArea);

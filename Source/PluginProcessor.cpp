@@ -188,22 +188,22 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 
     float cutoff    = filterCutoffParam->load();
     float resonance = filterResonanceParam->load();
-    int filterType  = (int) filterTypeParam->load();
+    int filterType  = static_cast<int>(filterTypeParam->load());
 
     float pan = panParam->load();
 
     // ===================== MAP RAW PARAMETERS ===================== //
 
     // On/off (bool)
-    bool osc1On = osc1OnParam ? (bool)*osc1OnParam : true;
+    bool osc1On = osc1OnParam ? static_cast<bool>(*osc1OnParam) : true;
 
     // Waveforms (choice -> int)
-    int wave1 = (int) std::round(osc1WaveParam->load());
-    int wave2 = (int) std::round(osc2WaveParam->load());
+    int wave1 = static_cast<int>(std::round(osc1WaveParam->load()));
+    int wave2 = static_cast<int>(std::round(osc2WaveParam->load()));
 
     // Pitch (choice -> int)
-    int pitch1 = (int) std::round(osc1PitchParam->load());
-    int pitch2 = (int) std::round(osc2PitchParam->load());
+    int pitch1 = static_cast<int>(std::round(osc1PitchParam->load()));
+    int pitch2 = static_cast<int>(std::round(osc2PitchParam->load()));
 
     float detune1 = osc1DetuneParam->load();
     float detune2 = osc2DetuneParam->load();
@@ -230,8 +230,8 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 
             // pitch, detune, gain for each oscillator
             v->updateFromParameters(
-                gain1, (float)pitch1, detune1,
-                gain2, (float)pitch2, detune2,
+                gain1, static_cast<float>(pitch1), detune1,
+                gain2, static_cast<float>(pitch2), detune2,
                 blend,
                 osc1FM, osc2FM
             );

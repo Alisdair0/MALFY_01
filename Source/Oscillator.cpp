@@ -4,6 +4,7 @@ Oscillator::Oscillator()
     : spec{}
 {}
 
+//==============================================================================
 void Oscillator::prepare(double sampleRate, int samplesPerBlock, int channels)
 {
     spec.sampleRate = sampleRate;
@@ -19,6 +20,7 @@ void Oscillator::prepare(double sampleRate, int samplesPerBlock, int channels)
     osc.setFrequency(440.0f, true);
 }
 
+//==============================================================================
 void Oscillator::process(juce::AudioBuffer<float>& buffer)
 {
     juce::dsp::AudioBlock<float> audioBlock(buffer);
@@ -27,23 +29,28 @@ void Oscillator::process(juce::AudioBuffer<float>& buffer)
     osc.process(context);
 }
 
+//==============================================================================
 void Oscillator::setFrequency(float freq)
 {
-    baseFrequency = freq;        // store the frequency so FM can modify it later
-    osc.setFrequency(freq, true); // true = no smoothing
+    // Store frequency for modulation
+    baseFrequency = freq;
+    osc.setFrequency(freq, true);
 }
 
+//==============================================================================
 void Oscillator::setWaveform(int type)
 {
     initWaveform(type);
 }
 
+//==============================================================================
 void Oscillator::reset()
 {
     // Reset phase to zero
     osc.reset();
 }
 
+//==============================================================================
 void Oscillator::initWaveform(int waveformIndex)
 {
     switch (waveformIndex)
@@ -105,29 +112,34 @@ void Oscillator::initWaveform(int waveformIndex)
     }
 }
 
-void Oscillator::processWithFM (juce::AudioBuffer<float>& buffer,
-                               const float* fmBuffer,
-                               float fmDepth)
-{
-    auto numSamples = buffer.getNumSamples();
+//==============================================================================
 
-    for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
-    {
-        for (int i = 0; i < numSamples; ++i)
-        {
-            float mod = fmBuffer[i];
+// Replaced per-sample FM inside SynthVoice for better accuracy
 
-            float freqOffset = mod * fmDepth * baseFrequency;
-            float freq = baseFrequency + freqOffset;
+// void Oscillator::processWithFM (juce::AudioBuffer<float>& buffer,
+//                                const float* fmBuffer,
+//                                float fmDepth)
+// {
+//     auto numSamples = buffer.getNumSamples();
+//
+//     for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
+//     {
+//         for (int i = 0; i < numSamples; ++i)
+//         {
+//             float mod = fmBuffer[i];
+//
+//             float freqOffset = mod * fmDepth * baseFrequency;
+//             float freq = baseFrequency + freqOffset;
+//
+//             freq = juce::jlimit(20.0f, 20000.0f, freq);
+//
+//             if (i % 4 == 0) // update every 4 samples
+//                 osc.setFrequency(freq, false);
+//         }
+//     }
+// }
 
-            freq = juce::jlimit(20.0f, 20000.0f, freq);
-
-            if (i % 4 == 0) // update every 4 samples
-                osc.setFrequency(freq, false);
-        }
-    }
-}
-
+//==============================================================================
 float Oscillator::processSample(float input)
 {
     return osc.processSample(input);

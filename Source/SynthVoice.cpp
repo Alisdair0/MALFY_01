@@ -152,24 +152,8 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
     mixBuffer.setSize(numChannels, numSamples, false, false, true);
     mixBuffer.clear();
 
-    // float g1 = std::cos(blend * juce::MathConstants<float>::halfPi);
-    // float g2 = std::sin(blend * juce::MathConstants<float>::halfPi);
-
     for (int i = 0; i < numSamples; ++i)
     {
-        // // osc2 is the modulator
-        // float modSample = osc2On ? osc2.processSample(0.0f) : 0.0f;
-        //
-        // float fmAmount = osc1FM * 0.2f;
-        //
-        // float fmDepthHz = osc1BaseFreq * fmAmount * 0.25f;
-        //
-        // // modulate osc1 around its base frequency
-        // float currentFreq = osc1BaseFreq + (modSample * fmDepthHz);
-        //
-        // // adjust to ensure freq doesn't go too low
-        // currentFreq = juce::jlimit(1.0f, 20000.0f, currentFreq);
-
         float modSample =  osc2.processSample(0.0f);
 
         // FM index style scaling
@@ -178,21 +162,16 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer,
         // stronger deviation based on modulator frequency
         float fmDepthHz = osc2BaseFreq * fmIndex * 4.0f;
 
+        // Apply frequency modulation & clamp range
         float currentFreq = osc1BaseFreq + (modSample * fmDepthHz);
         currentFreq = juce::jlimit(1.0f, 20000.0f, currentFreq);
 
+        // Update frequency per sample
         osc1.setFrequency(currentFreq);
 
-        // generate audio samples
+        // Generate the carrier output after modulation and trim output
         float s1 = osc1On ? osc1.processSample(0.0f) * osc1Gain : 0.0f;
-        //float s2 = osc2On ? modSample * osc2Gain : 0.0f;
-
         float out = s1 * level * 0.3f;
-
-        //float mixed = (s1 * g1 + s2 * g2) * level;
-        //float clipped = std::tanh(mixed);
-        //float clipped = mixed;
-
         for (int ch = 0; ch < numChannels; ++ch)
             mixBuffer.setSample(ch, i, out);
     }
