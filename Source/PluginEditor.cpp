@@ -12,7 +12,8 @@ WaveformDisplay::WaveformDisplay(AudioPluginAudioProcessor& p)
 {
     startTimerHz(60); // redraw at 60fps
 }
-void WaveformDisplay::paint(juce::Graphics& g) {
+void WaveformDisplay::paint(juce::Graphics& g)
+{
     g.fillAll(juce::Colours::black);
     g.setColour(juce::Colours::slategrey);
     g.drawRect(0, 0, getWidth(), getHeight());
@@ -24,11 +25,9 @@ void WaveformDisplay::paint(juce::Graphics& g) {
     auto& data = processor.scopeData;
     int writePos = processor.scopeWritePos.load();
 
-    // Subtle border
     g.setColour(juce::Colours::slategrey.withAlpha(0.6f));
     g.drawRect(bounds, 1.0f);
 
-    // Subtle grid
     g.setColour(juce::Colours::dimgrey.withAlpha(0.18f));
 
     for (int i = 1; i < 4; ++i)
@@ -44,31 +43,87 @@ void WaveformDisplay::paint(juce::Graphics& g) {
     }
 
     juce::Path p;
-    p.startNewSubPath(0.0f, static_cast<float>(getHeight()) / 2.0f);
 
-    for (int i = 0; i < AudioPluginAudioProcessor::scopeSize; ++i)
+    if (scopeMode == ScopeMode::scrolling)
     {
-        auto index = (writePos + i) % AudioPluginAudioProcessor::scopeSize;
+        for (int i = 0; i < AudioPluginAudioProcessor::scopeSize; ++i)
+        {
+            auto index = (writePos + i) % AudioPluginAudioProcessor::scopeSize;
 
-        // check sourceRangeMin cast
-        float x = juce::jmap(static_cast<float>(i),
-            0.f, static_cast<float>(AudioPluginAudioProcessor::scopeSize - 1),
-            0.f,
-            static_cast<float>(getWidth()));
-        float y = juce::jmap(juce::jlimit(-1.0f,
-            1.0f,
-            data[static_cast<size_t>(index)] * 2.5f),
-            -1.f, 1.f,
-            static_cast<float>(getHeight()) - 6.0f,
-            6.0f);
+            float x = juce::jmap(static_cast<float>(i),
+                                 0.f, static_cast<float>(AudioPluginAudioProcessor::scopeSize - 1),
+                                 0.f, static_cast<float>(getWidth()));
 
-        if (i == 0)
-            p.startNewSubPath(x, y);
-        else
-            p.lineTo(x, y);
+            float y = juce::jmap(juce::jlimit(-1.0f, 1.0f,
+                                              data[static_cast<size_t>(index)] * 2.5f),
+                                 -1.f, 1.f,
+                                 static_cast<float>(getHeight()) - 6.0f,
+                                 6.0f);
+
+            if (i == 0)
+                p.startNewSubPath(x, y);
+            else
+                p.lineTo(x, y);
+        }
+    }
+    else if (scopeMode == ScopeMode::triggered)
+    {
+        constexpr int scopeSize = AudioPluginAudioProcessor::scopeSize;
+
+        // How many samples we want to draw across the screen
+        const int samplesToDraw = 256;
+
+        // Build a linear copy: orderedData[0] = oldest, orderedData[scopeSize - 1] = newest
+        std::array<float, scopeSize> orderedData{};
+
+        for (int i = 0; i < scopeSize; ++i)
+            orderedData[(size_t) i] = data[(size_t) ((writePos + i) % scopeSize)];
+
+        // Search backwards for a stable trigger before that.
+        int endIndex = scopeSize - 1;
+        int nominalStart = juce::jmax(0, endIndex - samplesToDraw + 1);
+
+        // Search backwards from nominalStart to find a rising zero crossing
+        int triggerIndex = nominalStart;
+
+        for (int i = nominalStart; i > 1; --i)
+        {
+            float prevSample = orderedData[(size_t) (i - 1)];
+            float currSample = orderedData[(size_t) i];
+
+            if (prevSample < -0.01f && currSample >= 0.01f)
+            {
+                triggerIndex = i;
+                break;
+            }
+        }
+
+        // Draw a full window
+        if (triggerIndex + samplesToDraw > scopeSize)
+            triggerIndex = scopeSize - samplesToDraw;
+
+        if (samplesToDraw < 2)
+            return;
+
+        for (int i = 0; i < samplesToDraw; ++i)
+        {
+            float x = juce::jmap((float) i,
+                                 0.0f, (float) (samplesToDraw - 1),
+                                 0.0f, (float) getWidth());
+
+            float y = juce::jmap(juce::jlimit(-1.0f, 1.0f,
+                                              orderedData[(size_t) (triggerIndex + i)] * 2.5f),
+                                 -1.0f, 1.0f,
+                                 (float) getHeight() - 6.0f,
+                                 6.0f);
+
+            if (i == 0)
+                p.startNewSubPath(x, y);
+            else
+                p.lineTo(x, y);
+        }
     }
 
-    // Glow layers
     g.setColour(juce::Colours::yellow.withAlpha(0.10f));
     g.strokePath(p, juce::PathStrokeType(10.0f));
 
@@ -93,7 +148,36 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
 
     auto& state = p.getState();
 
+    // Title
+    titleLabel.setText("MALFY", juce::dontSendNotification);
+    titleLabel.setJustificationType(juce::Justification::left);
+    titleLabel.setColour(juce::Label::textColourId, juce::Colours::white);
+    //titleLabel.setFont(juce::Font(18.0f, juce::Font::bold));
+
+    addAndMakeVisible(titleLabel);
+
+    // Oscilloscope
     addAndMakeVisible(waveformDisplay);
+
+    scopeModeLabel.setText("Scope", juce::dontSendNotification);
+    scopeModeLabel.setJustificationType(juce::Justification::centredLeft);
+    addAndMakeVisible(scopeModeLabel);
+
+    scopeModeBox.addItem("Scroll", 1);
+    scopeModeBox.addItem("Triggered", 2);
+    scopeModeBox.setSelectedId(1);
+
+    scopeModeBox.onChange = [this]
+    {
+        auto id = scopeModeBox.getSelectedId();
+
+        if (id == 1)
+            waveformDisplay.setScopeMode(WaveformDisplay::ScopeMode::scrolling);
+        else if (id == 2)
+            waveformDisplay.setScopeMode(WaveformDisplay::ScopeMode::triggered);
+    };
+
+    addAndMakeVisible(scopeModeBox);
 
     // =============== //
     // GLOBAL CONTROLS //
@@ -101,7 +185,7 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
 
     // Master Gain (global)
     masterGainSlider.setSliderStyle (juce::Slider::LinearVertical);
-    masterGainSlider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 60, 20);
+    masterGainSlider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 80, 20);
     addAndMakeVisible (masterGainSlider);
     addAndMakeVisible (masterGainLabel);
     masterGainAttachment = std::make_unique<
@@ -115,7 +199,7 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
     //    ENVELOPE    //
     // ============== //
 
-    adsrLabel.setText("Envelope", juce::dontSendNotification);
+    adsrLabel.setText("ENV", juce::dontSendNotification);
     adsrLabel.setJustificationType(juce::Justification::centredLeft);
     addAndMakeVisible(adsrLabel);
 
@@ -155,16 +239,16 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
         juce::AudioProcessorValueTreeState::SliderAttachment>(
             state, "release", releaseSlider);
 
-    configureSliderTwoDecimals(attackSlider);
-    configureSliderTwoDecimals(decaySlider);
-    configureSliderTwoDecimals(sustainSlider);
-    configureSliderTwoDecimals(releaseSlider);
+    attackSlider.setNumDecimalPlacesToDisplay(2);
+    decaySlider.setNumDecimalPlacesToDisplay(2);
+    sustainSlider.setNumDecimalPlacesToDisplay(2);
+    releaseSlider.setNumDecimalPlacesToDisplay(2);
 
     // ============== //
     // FILTER SECTION //
     // ============== //
 
-    filterLabel.setText("Filter", juce::dontSendNotification);
+    filterLabel.setText("FLTR", juce::dontSendNotification);
     filterLabel.setJustificationType(juce::Justification::centred);
     addAndMakeVisible(filterLabel);
 
@@ -221,11 +305,11 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
     addAndMakeVisible(osc1PitchLabel);
     addAndMakeVisible(osc1WaveLabel);
 
-    osc1GainLabel.setText("Gain", juce::dontSendNotification);
-    osc1DetuneLabel.setText("Detune", juce::dontSendNotification);
+    osc1GainLabel.setText("gain", juce::dontSendNotification);
+    osc1DetuneLabel.setText("detune", juce::dontSendNotification);
     osc1FmLabel.setText("FM", juce::dontSendNotification);
 
-    carrierLabel.setText("Carrier", juce::dontSendNotification);
+    carrierLabel.setText("CARRIER", juce::dontSendNotification);
     carrierLabel.setJustificationType(juce::Justification::centredLeft);
     addAndMakeVisible(carrierLabel);
 
@@ -283,7 +367,7 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
     addAndMakeVisible(osc2FmLabel);
     addAndMakeVisible(osc2PitchLabel);
     addAndMakeVisible(osc2WaveLabel);
-    modulatorLabel.setText("Modulator", juce::dontSendNotification);
+    modulatorLabel.setText("MODULATOR", juce::dontSendNotification);
     modulatorLabel.setJustificationType(juce::Justification::centredLeft);
     addAndMakeVisible(modulatorLabel);
 
@@ -357,185 +441,234 @@ AudioPluginAudioProcessorEditor::~AudioPluginAudioProcessorEditor() = default;
 
 void AudioPluginAudioProcessorEditor::paint (juce::Graphics& g)
 {
-    g.fillAll(juce::Colour(0xff1e1e1e));
-    constexpr int numControls = 4;
-    constexpr int margin = 10;
-    juce::Rectangle<int> area = (getLocalBounds());
-    const int areaWidth = area.getWidth();
-    const int areaHeight = area.getHeight() / 2;
-    const int controlHeight = areaHeight - margin;
-    const int rectangleWidth = (areaWidth - (margin * (numControls + 1))) / numControls;
+    // ===== Colours =====
+    const auto backgroundColour = juce::Colour(0xff1e1e1e);
 
-    // Red border
-    juce::Rectangle<int> masterBorder;
-    masterBorder.setBounds(margin, controlHeight, rectangleWidth, areaHeight);
-    g.setColour(juce::Colours::darkred);
-    g.drawRoundedRectangle(masterBorder.toFloat(), 0.0f,2.0f);
-    g.setColour(juce::Colour(0xff001933));
-    g.fillRect(masterBorder.toFloat());
+    const auto carrierFill  = juce::Colour(0xff001933);
+    const auto modFill      = juce::Colour(0xff28643C);
+    const auto adsrFill     = juce::Colour(0xff4C197F);
+    const auto filterFill   = juce::Colour(0xff7F6B00);
 
-    // Blue border
-    juce::Rectangle<int> oscBorder;
-    oscBorder.setBounds((margin * 2) + rectangleWidth, controlHeight, rectangleWidth, areaHeight);
-    g.setColour(juce::Colours::darkblue);
-    g.drawRoundedRectangle(oscBorder.toFloat(), 0.0f,2.0f);
-    g.setColour(juce::Colour(0xff28643C));
-    g.fillRect(oscBorder.toFloat());
+    const auto carrierBorder = juce::Colours::darkred;
+    const auto modBorder     = juce::Colours::darkblue;
+    const auto adsrBorder    = juce::Colours::darkorange;
+    const auto filterBorder  = juce::Colours::darkcyan;
 
-    // Orange border
-    juce::Rectangle<int> adsrBorder;
-    adsrBorder.setBounds((margin * 3) + (rectangleWidth * 2), controlHeight, rectangleWidth, areaHeight);
-    g.setColour(juce::Colours::darkorange);
-    g.drawRoundedRectangle(adsrBorder.toFloat(), 0.0f,2.0f);
-    g.setColour(juce::Colour(0xff4C197F));
-    g.fillRect(adsrBorder.toFloat());
+    // ===== Layout constants =====
+    constexpr int outerPadding      = 10;
+    constexpr int sectionSpacing    = 10;
+    constexpr int titleBarHeight    = 30;
+    constexpr int topSectionHeight  = 270;
+    constexpr int bottomHeight   = 240;
+    constexpr float cornerSize      = 0.0f;
+    constexpr float borderThickness = 2.0f;
 
-    // Cyan border
-    juce::Rectangle<int> filterBorder;
-    filterBorder.setBounds((margin * 4) + (rectangleWidth * 3), controlHeight, rectangleWidth, areaHeight);
-    g.setColour(juce::Colours::darkcyan);
-    g.drawRoundedRectangle(filterBorder.toFloat(), 0.0f,2.0f);
-    g.setColour(juce::Colour(0xff7F6B00));
-    g.fillRect(filterBorder.toFloat());
+    g.fillAll(backgroundColour);
+
+    auto bounds = getLocalBounds().reduced(outerPadding);
+
+    // Title
+    bounds.removeFromTop(titleBarHeight);
+    bounds.removeFromTop(sectionSpacing);
+
+    // Top section (waveform + master) - skip drawing panel backgrounds here
+    bounds.removeFromTop(topSectionHeight);
+    bounds.removeFromTop(sectionSpacing);
+
+    // Bottom row: 4 equal panels
+    auto bottomArea = bounds.removeFromBottom(bottomHeight);
+    const int panelWidth = (bottomArea.getWidth() - (sectionSpacing * 3)) / 4;
+
+    auto carrierArea = bottomArea.removeFromLeft(panelWidth);
+    bottomArea.removeFromLeft(sectionSpacing);
+
+    auto modArea = bottomArea.removeFromLeft(panelWidth);
+    bottomArea.removeFromLeft(sectionSpacing);
+
+    auto adsrArea = bottomArea.removeFromLeft(panelWidth);
+    bottomArea.removeFromLeft(sectionSpacing);
+
+    auto filterArea = bottomArea;
+
+    auto drawPanel = [&] (juce::Rectangle<int> area,
+                          juce::Colour fill,
+                          juce::Colour border)
+    {
+        g.setColour(fill);
+        g.fillRect(area.toFloat());
+
+        g.setColour(border);
+        g.drawRoundedRectangle(area.toFloat(), cornerSize, borderThickness);
+    };
+
+    drawPanel(carrierArea, carrierFill, carrierBorder);
+    drawPanel(modArea,     modFill,     modBorder);
+    drawPanel(adsrArea,    adsrFill,    adsrBorder);
+    drawPanel(filterArea,  filterFill,  filterBorder);
 }
 
-void AudioPluginAudioProcessorEditor::resized() {
-    constexpr int margin = 10;
-    constexpr int waveformBottomGap = 15;
-    auto area = getLocalBounds();
+void AudioPluginAudioProcessorEditor::resized()
+{
+    // ===== Layout constants =====
+    constexpr int outerPadding      = 10;
+    constexpr int sectionSpacing    = 10;
+    constexpr int titleBarHeight    = 30;
+    constexpr int topSectionHeight  = 270;
+    constexpr int masterColumnWidth = 110;
+    constexpr int panelHeaderHeight = 20;
+    constexpr int comboRowHeight    = 40;
+    constexpr int smallLabelHeight  = 18;
+    constexpr int sliderRowHeight   = 105;
+    constexpr int valueRowHeight    = 28;
 
-    // Split Window
-    auto topArea = area.removeFromTop(area.getHeight() / 2);
-    topArea.removeFromBottom(waveformBottomGap);
-    waveformDisplay.setBounds(topArea.reduced(margin));
+    auto bounds = getLocalBounds().reduced(outerPadding);
 
-    // Control Zone
-    constexpr int numControls = 4;
-    const int areaWidth = area.getWidth();
-    const int areaHeight = area.getHeight();
-    const int rectangleWidth = (areaWidth - (margin * (numControls + 1))) / numControls;
+    // ===== Title =====
+    auto titleArea = bounds.removeFromTop(titleBarHeight);
+    titleLabel.setBounds(titleArea);
 
-    // Divide 4 sections
-    juce::Rectangle<int> masterArea (margin, area.getY(), rectangleWidth, areaHeight);
-    juce::Rectangle<int> oscArea ((margin * 2) + rectangleWidth, area.getY(), rectangleWidth, areaHeight);
-    juce::Rectangle<int> adsrArea ((margin * 3) + (rectangleWidth * 2), area.getY(), rectangleWidth, areaHeight);
-    juce::Rectangle<int> filterArea ((margin * 4) + (rectangleWidth * 3), area.getY(), rectangleWidth, areaHeight);
+    bounds.removeFromTop(sectionSpacing);
 
-    // Master (Red)
-    masterGainSlider.setBounds(masterArea.reduced(20).removeFromTop(120));
-    masterGainLabel.setBounds(masterGainSlider.getX(),
-                              masterGainSlider.getBottom(),
-                              masterGainSlider.getWidth(), 20);
+    // ===== Top area: waveform + master =====
+    auto topArea = bounds.removeFromTop(topSectionHeight);
 
-    // Oscillators (Blue)
-    auto osc = oscArea.reduced(10);
+    auto masterArea = topArea.removeFromRight(masterColumnWidth);
+    topArea.removeFromRight(sectionSpacing);
 
-    // Split Oscillators vertically
-    auto osc1Area = osc.removeFromTop(static_cast<int>(osc.getHeight() / 1.5));
-    osc.removeFromTop(10);
-    auto osc2Area = osc;
+    waveformDisplay.setBounds(topArea);
 
-    // ---------- OSC 1 ----------
+    scopeModeLabel.setBounds(masterArea.removeFromTop(20));
+    scopeModeBox.setBounds(masterArea.removeFromTop(24));
+    masterArea.removeFromTop(8);
+    masterGainSlider.setBounds(masterArea);
+
+    auto masterContent = masterArea.reduced(10, 20);
+    masterGainLabel.setBounds(masterContent.removeFromBottom(smallLabelHeight));
+    masterGainSlider.setBounds(masterContent);
+
+    bounds.removeFromTop(sectionSpacing);
+
+    // ===== Bottom row: 4 equal panels =====
+    constexpr int bottomHeight = 240;
+    auto bottomArea = bounds.removeFromBottom(bottomHeight);
+
+    const int panelWidth = (bottomArea.getWidth() - (sectionSpacing * 3)) / 4;
+
+    auto carrierArea   = bottomArea.removeFromLeft(panelWidth);
+    bottomArea.removeFromLeft(sectionSpacing);
+
+    auto modArea       = bottomArea.removeFromLeft(panelWidth);
+    bottomArea.removeFromLeft(sectionSpacing);
+
+    auto adsrArea      = bottomArea.removeFromLeft(panelWidth);
+    bottomArea.removeFromLeft(sectionSpacing);
+
+    auto filterArea    = bottomArea;
+
+    // =========================================================
+    // Carrier
+    // =========================================================
     {
-        auto header = osc1Area.removeFromTop(20);
+        auto area = carrierArea.reduced(10);
 
-        auto labelArea = header.removeFromLeft(header.getWidth() * 2 / 3);
-        carrierLabel.setBounds(labelArea);
+        auto header = area.removeFromTop(panelHeaderHeight);
+        auto buttonArea = header.removeFromRight(50);
+        carrierLabel.setBounds(header);
+        osc1OnButton.setBounds(buttonArea);
 
-        osc1OnButton.setBounds(header.reduced(2));
+        auto comboRow = area.removeFromTop(comboRowHeight);
+        auto waveBoxArea = comboRow.removeFromLeft(comboRow.getWidth() / 2);
+        osc1WaveBox.setBounds(waveBoxArea.reduced(4));
+        osc1PitchBox.setBounds(comboRow.reduced(4));
 
-        auto top = osc1Area.removeFromTop(40);
-        int tW = top.getWidth() / 2;
+        auto comboLabels = area.removeFromTop(smallLabelHeight);
+        auto waveLabelArea = comboLabels.removeFromLeft(comboLabels.getWidth() / 2);
+        osc1WaveLabel.setBounds(waveLabelArea);
+        osc1PitchLabel.setBounds(comboLabels);
 
-        osc1WaveBox.setBounds(top.removeFromLeft(tW).reduced(5));
-        osc1PitchBox.setBounds(top.reduced(5));
+        auto sliderRow = area.removeFromTop(sliderRowHeight);
+        auto detuneArea = sliderRow.removeFromLeft(sliderRow.getWidth() / 3);
+        auto gainArea   = sliderRow.removeFromLeft(sliderRow.getWidth() / 2);
+        auto fmArea     = sliderRow;
 
-        auto boxLabels = osc1Area.removeFromTop(10);
-        int bL = boxLabels.getWidth() / 2;
+        detune1Slider.setBounds(detuneArea.reduced(4));
+        gain1Slider.setBounds(gainArea.reduced(4));
+        fm1Slider.setBounds(fmArea.reduced(4));
 
-        osc1WaveLabel.setBounds(boxLabels.removeFromLeft(bL));
-        osc1PitchLabel.setBounds(boxLabels);
+        auto valueRow = area.removeFromTop(valueRowHeight);
+        auto detuneValue = valueRow.removeFromLeft(valueRow.getWidth() / 3);
+        auto gainValue   = valueRow.removeFromLeft(valueRow.getWidth() / 2);
+        auto fmValue     = valueRow;
 
-        auto labelSpace = osc1Area.removeFromBottom(24);
-
-        auto sliders = osc1Area.removeFromTop(140);
-        int w = sliders.getWidth() / 3;
-
-        detune1Slider.setBounds(sliders.removeFromLeft(w).reduced(5));
-        gain1Slider.setBounds(sliders.removeFromLeft(w).reduced(5));
-        fm1Slider.setBounds(sliders.reduced(5));
-
-        int wL = labelSpace.getWidth() / 3;
-
-        osc1DetuneLabel.setBounds(labelSpace.removeFromLeft(wL));
-        osc1GainLabel.setBounds(labelSpace.removeFromLeft(wL));
-        osc1FmLabel.setBounds(labelSpace);
+        osc1DetuneLabel.setBounds(detuneValue.reduced(4, 0));
+        osc1GainLabel.setBounds(gainValue.reduced(4, 0));
+        osc1FmLabel.setBounds(fmValue.reduced(4, 0));
     }
 
-    // ---------- OSC 2 ----------
+    // =========================================================
+    // Modulator
+    // =========================================================
     {
-        auto header = osc2Area.removeFromTop(20);
+        auto area = modArea.reduced(10);
+
+        auto header = area.removeFromTop(panelHeaderHeight);
         modulatorLabel.setBounds(header);
 
-        auto top = osc2Area.removeFromTop(40);
-        int tW = top.getWidth() / 2;
+        auto comboRow = area.removeFromTop(comboRowHeight);
+        auto waveBoxArea = comboRow.removeFromLeft(comboRow.getWidth() / 2);
+        osc2WaveBox.setBounds(waveBoxArea.reduced(4));
+        osc2PitchBox.setBounds(comboRow.reduced(4));
 
-        osc2WaveBox.setBounds(top.removeFromLeft(tW).reduced(5));
-        osc2PitchBox.setBounds(top.reduced(5));
-
-        auto boxLabels = osc2Area.removeFromTop(10);
-        int bL = boxLabels.getWidth() / 2;
-
-        osc2WaveLabel.setBounds(boxLabels.removeFromLeft(bL));
-        osc2PitchLabel.setBounds(boxLabels);
-
-        // auto sliders = osc2Area.removeFromTop(100);
-        // int w = sliders.getWidth() / 3;
-        //
-        // detune2Slider.setBounds(sliders.removeFromLeft(w).reduced(5));
-        //
-        // auto labels = osc2Area.removeFromTop(20);
-        // int wL = labels.getWidth() / 3;
-        //
-        // osc2DetuneLabel.setBounds(labels.removeFromLeft(wL));
+        auto comboLabels = area.removeFromTop(smallLabelHeight);
+        auto waveLabelArea = comboLabels.removeFromLeft(comboLabels.getWidth() / 2);
+        osc2WaveLabel.setBounds(waveLabelArea);
+        osc2PitchLabel.setBounds(comboLabels);
     }
 
-    // ADSR (yellow)
-    auto adsr = adsrArea.reduced(10);
+    // =========================================================
+    // ADSR
+    // =========================================================
+    {
+        auto area = adsrArea.reduced(10);
 
-    auto sliders = adsr.removeFromTop(120);
-    int width = sliders.getWidth() / 4;
+        adsrLabel.setBounds(area.removeFromTop(panelHeaderHeight));
 
-    attackSlider.setBounds(sliders.removeFromLeft(width).reduced(5));
-    decaySlider.setBounds(sliders.removeFromLeft(width).reduced(5));
-    sustainSlider.setBounds(sliders.removeFromLeft(width).reduced(5));
-    releaseSlider.setBounds(sliders.reduced(5));
+        auto sliderRow = area.removeFromTop(120);
+        const int w = sliderRow.getWidth() / 4;
 
-    // Labels aligned under each slider
-    auto labels = adsr.removeFromTop(20);
-    int wL = labels.getWidth() / 4;
+        attackSlider.setBounds(sliderRow.removeFromLeft(w).reduced(4));
+        decaySlider.setBounds(sliderRow.removeFromLeft(w).reduced(4));
+        sustainSlider.setBounds(sliderRow.removeFromLeft(w).reduced(4));
+        releaseSlider.setBounds(sliderRow.reduced(4));
 
-    attackLabel.setBounds(labels.removeFromLeft(wL));
-    decayLabel.setBounds(labels.removeFromLeft(wL));
-    sustainLabel.setBounds(labels.removeFromLeft(wL));
-    releaseLabel.setBounds(labels);
+        auto labelRow = area.removeFromTop(valueRowHeight);
+        const int lw = labelRow.getWidth() / 4;
 
-    // Filter (Cyan)
-    auto filter = filterArea.reduced(10);
+        attackLabel.setBounds(labelRow.removeFromLeft(lw));
+        decayLabel.setBounds(labelRow.removeFromLeft(lw));
+        sustainLabel.setBounds(labelRow.removeFromLeft(lw));
+        releaseLabel.setBounds(labelRow);
+    }
 
-    // Top controls
-    filterLabel.setBounds(filter.removeFromTop(20));
-    filterType.setBounds(filter.removeFromTop(25));
+    // =========================================================
+    // Filter
+    // =========================================================
+    {
+        auto area = filterArea.reduced(10);
 
-    // Clamp slider sizes
-    auto sliderArea = filter.removeFromTop(140);
-    int filterWidth = sliderArea.getWidth() / 2;
+        filterLabel.setBounds(area.removeFromTop(panelHeaderHeight));
+        filterType.setBounds(area.removeFromTop(30));
 
-    cutoffSlider.setBounds(sliderArea.removeFromLeft(filterWidth).reduced(5));
-    resonanceSlider.setBounds(sliderArea.reduced(5));
+        auto sliderRow = area.removeFromTop(140);
+        auto cutoffArea = sliderRow.removeFromLeft(sliderRow.getWidth() / 2);
 
-    // Labels below
-    auto labelArea = filter.removeFromTop(20);
-    cutoffLabel.setBounds(labelArea.removeFromLeft(labelArea.getWidth() / 2));
-    resonanceLabel.setBounds(labelArea);
+        cutoffSlider.setBounds(cutoffArea.reduced(4));
+        resonanceSlider.setBounds(sliderRow.reduced(4));
+
+        auto labelRow = area.removeFromTop(valueRowHeight);
+        auto cutoffLabelArea = labelRow.removeFromLeft(labelRow.getWidth() / 2);
+
+        cutoffLabel.setBounds(cutoffLabelArea);
+        resonanceLabel.setBounds(labelRow);
+    }
 }

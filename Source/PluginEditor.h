@@ -10,13 +10,23 @@ class WaveformDisplay : public juce::Component,
                         private juce::Timer
 {
 public:
+    enum class ScopeMode
+    {
+        scrolling = 1,
+        triggered = 2
+    };
+
     explicit WaveformDisplay(AudioPluginAudioProcessor& p);
 
     void paint(juce::Graphics& g) override;
     void resized() override {}
 
+    void setScopeMode (ScopeMode newMode) { scopeMode = newMode; repaint(); }
+
 private:
     AudioPluginAudioProcessor& processor;
+
+    ScopeMode scopeMode { ScopeMode::scrolling };
 
     void timerCallback() override;
 
@@ -36,7 +46,13 @@ public:
 
 private:
     WaveformDisplay waveformDisplay;
+    juce::ComboBox scopeModeBox;
+    juce::Label scopeModeLabel;
+
     AudioPluginAudioProcessor& processorRef;
+
+    // Title
+    juce::Label titleLabel;
 
     // Play
     juce::ToggleButton playButton { "Play" };
@@ -44,17 +60,17 @@ private:
 
     // Master Gain
     juce::Slider masterGainSlider;
-    juce::Label masterGainLabel { "MasterGainLabel", "Master Gain" };
+    juce::Label masterGainLabel { "MasterGainLabel", "MASTER GAIN" };
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> masterGainAttachment;
 
     // Detune (vertical)
     juce::Slider detuneSlider;
-    juce::Label detuneLabel { "DetuneLabel", "Detune (cents)" };
+    juce::Label detuneLabel { "DetuneLabel", "DETUNE (cents)" };
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> detuneAttachment;
 
     // Pitch Shift (combo)
     juce::ComboBox pitchShiftBox;
-    juce::Label pitchShiftLabel { "PitchShiftLabel", "Pitch (semitones)" };
+    juce::Label pitchShiftLabel { "PitchShiftLabel", "PITCH (semitones)" };
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> pitchShiftAttachment;
 
     // Pan
@@ -66,10 +82,10 @@ private:
     juce::Slider attackSlider, decaySlider, sustainSlider, releaseSlider;
 
     juce::Label adsrLabel;
-    juce::Label attackLabel  { "attackLabel",  "Attack" };
-    juce::Label decayLabel   { "decayLabel",   "Decay" };
-    juce::Label sustainLabel { "sustainLabel", "Sustain" };
-    juce::Label releaseLabel { "releaseLabel", "Release" };
+    juce::Label attackLabel  { "attackLabel",  "ATCK" };
+    juce::Label decayLabel   { "decayLabel",   "DEC" };
+    juce::Label sustainLabel { "sustainLabel", "SUST" };
+    juce::Label releaseLabel { "releaseLabel", "REL" };
 
     // ADSR attachments
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> attackAttachment;
@@ -79,8 +95,8 @@ private:
 
     // Filters
     juce::Label filterLabel;
-    juce::Label cutoffLabel    { "cutoffLabel",    "Cutoff" };
-    juce::Label resonanceLabel { "resonanceLabel", "Resonance" };
+    juce::Label cutoffLabel    { "cutoffLabel",    "CTFF" };
+    juce::Label resonanceLabel { "resonanceLabel", "RES" };
     juce::ComboBox filterType;
 
     juce::Slider cutoffSlider;
@@ -109,11 +125,11 @@ private:
 
     // OSC1 labels
     juce::Label carrierLabel;
-    juce::Label osc1GainLabel      { "osc1GainLabel",      "Gain" };
-    juce::Label osc1DetuneLabel    { "osc1DetuneLabel",    "Detune" };
+    juce::Label osc1GainLabel      { "osc1GainLabel",      "gain" };
+    juce::Label osc1DetuneLabel    { "osc1DetuneLabel",    "detune" };
     juce::Label osc1FmLabel        { "osc1FmLabel",        "FM" };
-    juce::Label osc1PitchLabel     { "osc1PitchLabel",     "Pitch" };
-    juce::Label osc1WaveLabel      { "osc1WaveLabel",      "Wave" };
+    juce::Label osc1PitchLabel     { "osc1PitchLabel",     "pitch" };
+    juce::Label osc1WaveLabel      { "osc1WaveLabel",      "wave" };
 
     // OSC2
     juce::ToggleButton osc2OnButton;
@@ -132,11 +148,11 @@ private:
 
     // OSC2 labels
     juce::Label modulatorLabel;
-    juce::Label osc2GainLabel      { "osc2GainLabel",      "Gain" };
-    juce::Label osc2DetuneLabel    { "osc2DetuneLabel",    "Detune" };
+    juce::Label osc2GainLabel      { "osc2GainLabel",      "gain" };
+    juce::Label osc2DetuneLabel    { "osc2DetuneLabel",    "detune" };
     juce::Label osc2FmLabel        { "osc2FmLabel",        "FM" };
-    juce::Label osc2PitchLabel     { "osc2PitchLabel",     "Pitch" };
-    juce::Label osc2WaveLabel      { "osc2WaveLabel",      "Wave" };
+    juce::Label osc2PitchLabel     { "osc2PitchLabel",     "pitch" };
+    juce::Label osc2WaveLabel      { "osc2WaveLabel",      "wave" };
 
     // Blend
     juce::Slider blendSlider;
