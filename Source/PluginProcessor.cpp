@@ -331,7 +331,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout AudioPluginAudioProcessor::c
     // ======= GLOBAL SLIDERS & BUTTONS ====== //
     params.push_back (std::make_unique<AudioParameterFloat>(
     "masterGain", "Master Gain",
-    NormalisableRange<float> (-60.0f, 20.0f, 0.01f),
+    NormalisableRange<float> (-40.0f, 20.0f, 0.01f),
     0.0f));
 
     params.push_back (std::make_unique<AudioParameterFloat>(

@@ -10,7 +10,7 @@ static void configureSliderTwoDecimals(juce::Slider& s)
 WaveformDisplay::WaveformDisplay(AudioPluginAudioProcessor& p)
     : processor(p)
 {
-    startTimerHz(60); // redraw at 60fps
+    startTimerHz(60);
 }
 void WaveformDisplay::paint(juce::Graphics& g)
 {
@@ -49,16 +49,16 @@ void WaveformDisplay::paint(juce::Graphics& g)
         for (int i = 0; i < AudioPluginAudioProcessor::scopeSize; ++i)
         {
             auto index = (writePos + i) % AudioPluginAudioProcessor::scopeSize;
-
             float x = juce::jmap(static_cast<float>(i),
-                                 0.f, static_cast<float>(AudioPluginAudioProcessor::scopeSize - 1),
-                                 0.f, static_cast<float>(getWidth()));
-
-            float y = juce::jmap(juce::jlimit(-1.0f, 1.0f,
-                                              data[static_cast<size_t>(index)] * 2.5f),
-                                 -1.f, 1.f,
-                                 static_cast<float>(getHeight()) - 6.0f,
-                                 6.0f);
+                        0.f, static_cast<float>(AudioPluginAudioProcessor::scopeSize - 1),
+                        0.f,
+                        static_cast<float>(getWidth()));
+            float y = juce::jmap(juce::jlimit(-1.0f,
+                1.0f,
+                data[static_cast<size_t>(index)] * 2.5f),
+                -1.f, 1.f,
+                static_cast<float>(getHeight()) - 6.0f,
+                6.0f);
 
             if (i == 0)
                 p.startNewSubPath(x, y);
@@ -441,7 +441,7 @@ AudioPluginAudioProcessorEditor::~AudioPluginAudioProcessorEditor() = default;
 
 void AudioPluginAudioProcessorEditor::paint (juce::Graphics& g)
 {
-    // ===== Colours =====
+    // ===== Colours ===== //
     const auto backgroundColour = juce::Colour(0xff1e1e1e);
 
     const auto carrierFill  = juce::Colour(0xff001933);
@@ -454,7 +454,7 @@ void AudioPluginAudioProcessorEditor::paint (juce::Graphics& g)
     const auto adsrBorder    = juce::Colours::darkorange;
     const auto filterBorder  = juce::Colours::darkcyan;
 
-    // ===== Layout constants =====
+    // ===== Constants ===== //
     constexpr int outerPadding      = 10;
     constexpr int sectionSpacing    = 10;
     constexpr int titleBarHeight    = 30;
@@ -509,7 +509,7 @@ void AudioPluginAudioProcessorEditor::paint (juce::Graphics& g)
 
 void AudioPluginAudioProcessorEditor::resized()
 {
-    // ===== Layout constants =====
+    // ===== Constants ===== //
     constexpr int outerPadding      = 10;
     constexpr int sectionSpacing    = 10;
     constexpr int titleBarHeight    = 30;
@@ -565,9 +565,9 @@ void AudioPluginAudioProcessorEditor::resized()
 
     auto filterArea    = bottomArea;
 
-    // =========================================================
-    // Carrier
-    // =========================================================
+    // ======= //
+    // Carrier //
+    // ======= //
     {
         auto area = carrierArea.reduced(10);
 
@@ -605,9 +605,9 @@ void AudioPluginAudioProcessorEditor::resized()
         osc1FmLabel.setBounds(fmValue.reduced(4, 0));
     }
 
-    // =========================================================
-    // Modulator
-    // =========================================================
+    // ========= //
+    // Modulator //
+    // ========= //
     {
         auto area = modArea.reduced(10);
 
@@ -625,9 +625,9 @@ void AudioPluginAudioProcessorEditor::resized()
         osc2PitchLabel.setBounds(comboLabels);
     }
 
-    // =========================================================
-    // ADSR
-    // =========================================================
+    // ======== //
+    // Envelope //
+    // ======== //
     {
         auto area = adsrArea.reduced(10);
 
@@ -650,9 +650,9 @@ void AudioPluginAudioProcessorEditor::resized()
         releaseLabel.setBounds(labelRow);
     }
 
-    // =========================================================
-    // Filter
-    // =========================================================
+    // ====== //
+    // Filter //
+    // ====== //
     {
         auto area = filterArea.reduced(10);
 

@@ -40,6 +40,8 @@ set(SourceFiles
     Source/SynthVoice.h
     Source/SynthSound.cpp
     Source/SynthSound.h
+        Source/CustomSlider.cpp
+        Source/CustomSlider.h
 )
 
 juce_add_plugin(${PROJECT_NAME}
