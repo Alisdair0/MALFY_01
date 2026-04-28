@@ -2,6 +2,9 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "PluginProcessor.h"
+#include "CustomSlider.h"
+#include "CustomCombo.h"
+#include "CustomTitle.h"
 
 //===================================//
 //   WAVEFORM VISUALIZER COMPONENT   //
@@ -26,7 +29,11 @@ public:
 private:
     AudioPluginAudioProcessor& processor;
 
+    std::array<float, AudioPluginAudioProcessor::triggeredSize> localTriggeredBuffer{};
     ScopeMode scopeMode { ScopeMode::scrolling };
+
+    float localPhaseOffset      { 0.0f };
+    bool  triggeredBufferFilled { false };
 
     void timerCallback() override;
 
@@ -46,40 +53,40 @@ public:
 
 private:
     WaveformDisplay waveformDisplay;
-    juce::ComboBox scopeModeBox;
+    CustomCombo scopeModeBox;
     juce::Label scopeModeLabel;
 
     AudioPluginAudioProcessor& processorRef;
 
     // Title
-    juce::Label titleLabel;
+    CustomTitle titleLabel;
 
     // Play
     juce::ToggleButton playButton { "Play" };
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> playAttachment;
 
     // Master Gain
-    juce::Slider masterGainSlider;
+    CustomSlider masterGainSlider;
     juce::Label masterGainLabel { "MasterGainLabel", "MASTER GAIN" };
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> masterGainAttachment;
 
     // Detune (vertical)
-    juce::Slider detuneSlider;
+    CustomSlider detuneSlider;
     juce::Label detuneLabel { "DetuneLabel", "DETUNE (cents)" };
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> detuneAttachment;
 
     // Pitch Shift (combo)
-    juce::ComboBox pitchShiftBox;
+    CustomCombo pitchShiftBox;
     juce::Label pitchShiftLabel { "PitchShiftLabel", "PITCH (semitones)" };
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> pitchShiftAttachment;
 
     // Pan
-    juce::Slider panSlider;
+    CustomSlider panSlider;
     juce::Label panLabel { "PanLabel", "Pan" };
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> panAttachment;
 
     // ADSR sliders + labels
-    juce::Slider attackSlider, decaySlider, sustainSlider, releaseSlider;
+    CustomSlider attackSlider, decaySlider, sustainSlider, releaseSlider;
 
     juce::Label adsrLabel;
     juce::Label attackLabel  { "attackLabel",  "ATCK" };
@@ -97,10 +104,10 @@ private:
     juce::Label filterLabel;
     juce::Label cutoffLabel    { "cutoffLabel",    "CTFF" };
     juce::Label resonanceLabel { "resonanceLabel", "RES" };
-    juce::ComboBox filterType;
+    CustomCombo filterType;
 
-    juce::Slider cutoffSlider;
-    juce::Slider resonanceSlider;
+    CustomSlider cutoffSlider;
+    CustomSlider resonanceSlider;
 
     // Filter attachments
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> filterTypeAttachment;
@@ -109,11 +116,11 @@ private:
 
     // OSC1
     juce::ToggleButton osc1OnButton;
-    juce::ComboBox osc1WaveBox;
-    juce::ComboBox osc1PitchBox;
-    juce::Slider   detune1Slider;
-    juce::Slider   gain1Slider;
-    juce::Slider   fm1Slider;
+    CustomCombo osc1WaveBox;
+    CustomCombo osc1PitchBox;
+    CustomSlider  detune1Slider;
+    CustomSlider   gain1Slider;
+    CustomSlider   fm1Slider;
 
     // OSC1 attachments
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> osc1OnAttachment;
@@ -133,8 +140,8 @@ private:
 
     // OSC2
     juce::ToggleButton osc2OnButton;
-    juce::ComboBox osc2WaveBox;
-    juce::ComboBox osc2PitchBox;
+    CustomCombo osc2WaveBox;
+    CustomCombo osc2PitchBox;
     juce::Slider   detune2Slider;
     juce::Slider   gain2Slider;
     juce::Slider   fm2Slider;

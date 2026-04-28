@@ -10,13 +10,11 @@ static void configureSliderTwoDecimals(juce::Slider& s)
 WaveformDisplay::WaveformDisplay(AudioPluginAudioProcessor& p)
     : processor(p)
 {
-    startTimerHz(60);
+    startTimerHz(60); //
 }
 void WaveformDisplay::paint(juce::Graphics& g)
 {
     g.fillAll(juce::Colours::black);
-    g.setColour(juce::Colours::slategrey);
-    g.drawRect(0, 0, getWidth(), getHeight());
 
     auto bounds = getLocalBounds().toFloat();
     auto width  = bounds.getWidth();
@@ -25,7 +23,19 @@ void WaveformDisplay::paint(juce::Graphics& g)
     auto& data = processor.scopeData;
     int writePos = processor.scopeWritePos.load();
 
-    g.setColour(juce::Colours::slategrey.withAlpha(0.6f));
+    // Mode-dependent colours
+    const bool isTriggered = (scopeMode == ScopeMode::triggered);
+
+    const juce::Colour waveCore  = isTriggered ? juce::Colour (0xFF78B4F0)
+                                               : juce::Colours::orange;
+    const juce::Colour waveGlow  = isTriggered ? juce::Colour (0xFF2A5F99)
+                                               : juce::Colours::yellow;
+
+    // RMS alpha
+    constexpr float amplitudeScale = 2.5f;
+
+    // Border & grid
+    g.setColour(juce::Colours::slategrey);
     g.drawRect(bounds, 1.0f);
 
     g.setColour(juce::Colours::dimgrey.withAlpha(0.18f));
@@ -42,96 +52,100 @@ void WaveformDisplay::paint(juce::Graphics& g)
         g.drawVerticalLine(static_cast<int>(x), 0.0f, height);
     }
 
+    // Waveform path
+    constexpr float verticalPadding = 6.0f;
     juce::Path p;
+
+    // Shared lambda to build a smooth cubic path from any float buffer
+    auto buildPath = [&] (auto getSample, int numSamples, float phaseOffset)
+    {
+        const auto w = static_cast<float> (getWidth());
+        const auto h = static_cast<float> (getHeight());
+        const auto n = static_cast<float> (numSamples - 1);
+
+        auto toX = [&] (int i) {
+            return juce::jmap (static_cast<float> (i) - phaseOffset, 0.f, n, 0.f, w);
+        };
+        auto toY = [&] (int i) {
+            return juce::jmap (juce::jlimit (-1.0f, 1.0f, getSample (i) * amplitudeScale),
+                               -1.0f, 1.0f, h - verticalPadding, verticalPadding);
+        };
+
+        p.startNewSubPath (toX (0), toY (0));
+
+        for (int i = 1; i < numSamples - 1; ++i)
+        {
+            // Catmull-Rom control points → cubic bezier
+            const float x0 = toX (i - 1), y0 = toY (i - 1);
+            const float x1 = toX (i),     y1 = toY (i);
+            const float x2 = toX (i + 1), y2 = toY (i + 1);
+
+            const float cp1x = x0 + (x1 - x0) * 0.5f;
+            const float cp1y = y0 + (y1 - y0) * 0.5f;
+            const float cp2x = x1 + (x2 - x1) * 0.5f;
+            const float cp2y = y1 + (y2 - y1) * 0.5f;
+
+            p.cubicTo (cp1x, cp1y, cp2x, cp2y, x1, y1);
+        }
+
+        // Final point
+        p.lineTo (toX (numSamples - 1), toY (numSamples - 1));
+    };
 
     if (scopeMode == ScopeMode::scrolling)
     {
-        for (int i = 0; i < AudioPluginAudioProcessor::scopeSize; ++i)
-        {
-            auto index = (writePos + i) % AudioPluginAudioProcessor::scopeSize;
-            float x = juce::jmap(static_cast<float>(i),
-                        0.f, static_cast<float>(AudioPluginAudioProcessor::scopeSize - 1),
-                        0.f,
-                        static_cast<float>(getWidth()));
-            float y = juce::jmap(juce::jlimit(-1.0f,
-                1.0f,
-                data[static_cast<size_t>(index)] * 2.5f),
-                -1.f, 1.f,
-                static_cast<float>(getHeight()) - 6.0f,
-                6.0f);
+        auto getSample = [&] (int i) {
+            return data[static_cast<std::size_t> ((writePos + i) % AudioPluginAudioProcessor::scopeSize)];
+        };
 
-            if (i == 0)
-                p.startNewSubPath(x, y);
-            else
-                p.lineTo(x, y);
-        }
+        buildPath (getSample, AudioPluginAudioProcessor::scopeSize, 0.0f);
     }
     else if (scopeMode == ScopeMode::triggered)
     {
-        constexpr int scopeSize = AudioPluginAudioProcessor::scopeSize;
+        float phaseOffset = 0.0f;
 
-        // How many samples we want to draw across the screen
-        const int samplesToDraw = 256;
-
-        // Build a linear copy: orderedData[0] = oldest, orderedData[scopeSize - 1] = newest
-        std::array<float, scopeSize> orderedData{};
-
-        for (int i = 0; i < scopeSize; ++i)
-            orderedData[(size_t) i] = data[(size_t) ((writePos + i) % scopeSize)];
-
-        // Search backwards for a stable trigger before that.
-        int endIndex = scopeSize - 1;
-        int nominalStart = juce::jmax(0, endIndex - samplesToDraw + 1);
-
-        // Search backwards from nominalStart to find a rising zero crossing
-        int triggerIndex = nominalStart;
-
-        for (int i = nominalStart; i > 1; --i)
+        if (processor.triggeredBufferReady.load (std::memory_order_acquire))
         {
-            float prevSample = orderedData[(size_t) (i - 1)];
-            float currSample = orderedData[(size_t) i];
-
-            if (prevSample < -0.01f && currSample >= 0.01f)
-            {
-                triggerIndex = i;
-                break;
-            }
+            localTriggeredBuffer = processor.triggeredBuffer;
+            phaseOffset = processor.triggerPhaseOffset.load (std::memory_order_relaxed);
+            localPhaseOffset = phaseOffset;
+            triggeredBufferFilled = true;
+            processor.triggeredBufferReady.store (false, std::memory_order_release);
+        }
+        else
+        {
+            phaseOffset = localPhaseOffset;
         }
 
-        // Draw a full window
-        if (triggerIndex + samplesToDraw > scopeSize)
-            triggerIndex = scopeSize - samplesToDraw;
+        constexpr int samplesToDraw = AudioPluginAudioProcessor::triggeredSize;
 
-        if (samplesToDraw < 2)
-            return;
-
-        for (int i = 0; i < samplesToDraw; ++i)
+        if (triggeredBufferFilled)
         {
-            float x = juce::jmap((float) i,
-                                 0.0f, (float) (samplesToDraw - 1),
-                                 0.0f, (float) getWidth());
+            auto getSample = [&] (int i) {
+                return localTriggeredBuffer[static_cast<std::size_t> (i)];
+            };
 
-            float y = juce::jmap(juce::jlimit(-1.0f, 1.0f,
-                                              orderedData[(size_t) (triggerIndex + i)] * 2.5f),
-                                 -1.0f, 1.0f,
-                                 (float) getHeight() - 6.0f,
-                                 6.0f);
+            buildPath (getSample, samplesToDraw, localPhaseOffset);
+        }
+        else
+        {
+            auto getSample = [&] (int i) {
+                return data[static_cast<std::size_t> ((writePos + i) % AudioPluginAudioProcessor::scopeSize)];
+            };
 
-            if (i == 0)
-                p.startNewSubPath(x, y);
-            else
-                p.lineTo(x, y);
+            buildPath (getSample, samplesToDraw, 0.0f);
         }
     }
 
-    g.setColour(juce::Colours::yellow.withAlpha(0.10f));
-    g.strokePath(p, juce::PathStrokeType(10.0f));
+    // Stroke glow
+    g.setColour (waveGlow.withAlpha (0.10f));
+    g.strokePath (p, juce::PathStrokeType (10.0f));
 
-    g.setColour(juce::Colours::orange.withAlpha(0.25f));
-    g.strokePath(p, juce::PathStrokeType(6.0f));
+    g.setColour (waveCore.withAlpha (0.25f));
+    g.strokePath (p, juce::PathStrokeType (6.0f));
 
-    g.setColour(juce::Colours::orange.withAlpha(0.95f));
-    g.strokePath(p, juce::PathStrokeType(2.2f));
+    g.setColour (waveCore.withAlpha (0.95f));
+    g.strokePath (p, juce::PathStrokeType (2.2f));
 }
 
 void WaveformDisplay::timerCallback()
@@ -148,13 +162,8 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
 
     auto& state = p.getState();
 
-    // Title
-    titleLabel.setText("MALFY", juce::dontSendNotification);
-    titleLabel.setJustificationType(juce::Justification::left);
-    titleLabel.setColour(juce::Label::textColourId, juce::Colours::white);
-    //titleLabel.setFont(juce::Font(18.0f, juce::Font::bold));
-
-    addAndMakeVisible(titleLabel);
+    titleLabel.setText("MALFY");
+    addAndMakeVisible (titleLabel);
 
     // Oscilloscope
     addAndMakeVisible(waveformDisplay);

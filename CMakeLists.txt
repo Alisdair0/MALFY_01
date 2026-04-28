@@ -31,17 +31,13 @@ CPMAddPackage(
 
 set(SourceFiles
     Source/PluginEditor.cpp
-    Source/PluginEditor.h
     Source/PluginProcessor.cpp
-    Source/PluginProcessor.h
     Source/Oscillator.cpp
-    Source/Oscillator.h
     Source/SynthVoice.cpp
-    Source/SynthVoice.h
     Source/SynthSound.cpp
-    Source/SynthSound.h
         Source/CustomSlider.cpp
-        Source/CustomSlider.h
+        Source/CustomCombo.cpp
+        Source/CustomTitle.cpp
 )
 
 juce_add_plugin(${PROJECT_NAME}
@@ -56,7 +52,7 @@ juce_add_plugin(${PROJECT_NAME}
     PLUGIN_MANUFACTURER_CODE Tap1
     PLUGIN_CODE Mlfy
     FORMATS Standalone
-    PRODUCT_NAME "MALFY"
+    PRODUCT_NAME "MFY_01"
 )
 
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SourceFiles})

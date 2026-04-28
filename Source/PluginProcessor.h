@@ -47,23 +47,79 @@ public:
     juce::AudioProcessorValueTreeState& getState() { return state; }
 
     // Visualizer
-    static constexpr int scopeSize = 512;   // oscilloscope resolution
+    static constexpr int scopeSize = 1024;   // oscilloscope resolution
 
     std::atomic<int> scopeWritePos { 0 };
     std::array<float, scopeSize> scopeData {};
 
+    // Trigger display buffer
+    static constexpr int triggeredSize = 256;
+    std::array<float, triggeredSize> triggeredBuffer{};
+    std::atomic<bool> triggeredBufferReady { false };
+    std::atomic<float> triggerPhaseOffset { 0.0f };
+
+    std::atomic<float> scopeRMS { 0.0f };
+
     // Call this for each sample to feed the oscilloscope
-    inline void pushNextSampleIntoScope(float sample)
+    inline void pushNextSampleIntoScope (float sample)
+{
+    // Ring buffer (scrolling mode)
+    auto index = static_cast<std::size_t> (scopeWritePos.load (std::memory_order_relaxed));
+    scopeData[index] = sample;
+    index = (index + 1) % static_cast<std::size_t> (scopeSize);
+    scopeWritePos.store (static_cast<int> (index), std::memory_order_relaxed);
+
+    // RMS
+    rmsAccumulator += sample * sample;
+    ++rmsSampleCount;
+
+    if (rmsSampleCount >= rmsWindowSize)
     {
-        auto index = static_cast<std::size_t>(
-            scopeWritePos.load(std::memory_order_relaxed));
-
-        scopeData[index] = sample;
-
-        index = (index + 1) % scopeSize;
-
-        scopeWritePos.store(static_cast<int>(index), std::memory_order_relaxed);
+        scopeRMS.store (std::sqrt (rmsAccumulator / static_cast<float> (rmsWindowSize)),
+                        std::memory_order_relaxed);
+        rmsAccumulator = 0.0f;
+        rmsSampleCount = 0;
     }
+
+    // Triggered capture
+    if (triggerCapturing)
+    {
+        triggeredBuffer[static_cast<std::size_t> (triggerFillCount)] = sample;
+        ++triggerFillCount;
+
+        if (triggerFillCount >= triggeredSize)
+        {
+            triggerCapturing = false;
+            triggerFillCount = 0;
+            triggerHoldoff   = triggeredSize;
+            triggeredBufferReady.store (true, std::memory_order_release);
+        }
+    }
+    else
+    {
+        if (triggerHoldoff > 0)
+        {
+            --triggerHoldoff;
+        }
+        else
+        {
+            // Rising zero crossing — interpolate fractional offset
+            if (triggerPrevSample < 0.0f && sample >= 0.0f)
+            {
+                // How far between prev and curr the zero actually sits, in [0, 1)
+                const float denom = triggerPrevSample - sample; // negative - positive = negative
+                triggerPhaseOffset = (denom != 0.0f)
+                                     ? triggerPrevSample / denom  // lands in [0, 1)
+                                     : 0.0f;
+
+                triggerCapturing = true;
+                triggerFillCount = 0;
+            }
+        }
+    }
+
+    triggerPrevSample = sample;
+}
 
 private:
     juce::Synthesiser synth;
@@ -114,6 +170,17 @@ private:
 
     // Blend
     std::atomic<float>* blendParam       = nullptr;
+
+    // Trigger capture state
+    int   triggerFillCount  { 0 };
+    int   triggerHoldoff    { 0 };
+    float triggerPrevSample { 0.0f };
+    bool  triggerCapturing  { false };
+
+    // RMS state
+    static constexpr int rmsWindowSize = 256;
+    float rmsAccumulator { 0.0f };
+    int   rmsSampleCount { 0 };
 
 
     //==============================================================================
