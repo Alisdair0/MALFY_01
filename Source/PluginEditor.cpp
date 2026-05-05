@@ -1,10 +1,6 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 
-static void configureSliderTwoDecimals(juce::Slider& s)
-{
-    s.setNumDecimalPlacesToDisplay(2);
-}
 // ============================================================ //
 
 WaveformDisplay::WaveformDisplay(AudioPluginAudioProcessor& p)
@@ -200,9 +196,6 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
     masterGainAttachment = std::make_unique<
         juce::AudioProcessorValueTreeState::SliderAttachment>(
             state, "masterGain", masterGainSlider);
-
-    configureSliderTwoDecimals(detuneSlider);
-    configureSliderTwoDecimals(masterGainSlider);
 
     // ============== //
     //    ENVELOPE    //

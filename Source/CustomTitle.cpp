@@ -17,7 +17,7 @@ void CustomTitle::paint (juce::Graphics& g)
     glyphs.createPath (p);
 
     constexpr int   numEchoes  = 10;
-    constexpr float offsetStep = 8.0f;
+    constexpr float offsetStep = 15.0f;
 
     // Echoes (filled + stroked, faded)
     for (int i = numEchoes; i >= 1; --i)
@@ -27,7 +27,7 @@ void CustomTitle::paint (juce::Graphics& g)
         g.fillPath (p);
         echo.applyTransform (juce::AffineTransform::translation (i * offsetStep, 0.0f));
 
-        const float alpha = 0.2f / (float) i;
+        const float alpha = 0.13f / (float) i;
         g.setColour (juce::Colours::white.withAlpha (alpha));
         g.fillPath   (echo);
         g.strokePath (echo, juce::PathStrokeType (1.5f));
