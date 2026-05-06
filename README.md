@@ -14,7 +14,6 @@ can be used in Logic specifically, and the VST3 version can be used in any other
 To use, setup a MIDI instrument and connect through JUCE settings. Mess with the sliders to make cool sounds! Feel free
 to download and experiment yourself.
 
+
 <img width="806" height="631" alt="Screenshot 2026-05-06 at 2 16 38 PM" src="https://github.com/user-attachments/assets/b93208ee-e5c2-423f-b169-b796b3bea801" />
 
-
-Alisdair
